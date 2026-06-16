@@ -18,32 +18,32 @@ DATA_FILE = Path("data.json")
 
 DEFAULT_HABITS: list[dict] = [
     # ── Faith (urutan pertama, tanpa penalti) ─────────────────────────────────
-    {"id":"subuh",    "name":"Subuh",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":3, "exp_pen":5},
-    {"id":"dzuhur",   "name":"Dzuhur",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":3, "exp_pen":5},
-    {"id":"asyar",    "name":"Asyar",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":3, "exp_pen":5},
-    {"id":"magrib",   "name":"Magrib",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":3, "exp_pen":5},
-    {"id":"isya",     "name":"Isya",     "cat":"Faith", "hp":3, "exp":5, "hp_pen":3, "exp_pen":5},
-    {"id":"duha",     "name":"Duha",     "cat":"Faith", "hp":3, "exp":5, "hp_pen":3, "exp_pen":5},
-    {"id":"ngaji",    "name":"Ngaji",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":3, "exp_pen":5},
-    {"id":"dzikir",   "name":"Dzikir",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":3, "exp_pen":5},
+    {"id":"subuh",    "name":"Subuh",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
+    {"id":"dzuhur",   "name":"Dzuhur",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
+    {"id":"asyar",    "name":"Asyar",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
+    {"id":"magrib",   "name":"Magrib",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
+    {"id":"isya",     "name":"Isya",     "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
+    {"id":"duha",     "name":"Duha",     "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
+    {"id":"ngaji",    "name":"Ngaji",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
+    {"id":"dzikir",   "name":"Dzikir",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
 
     # ── Fisik Harian ──────────────────────────────────────────────────────────
-    {"id":"tidur",       "name":"Tidur 7 Jam",    "cat":"Fisik Harian", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"stretching",  "name":"Stretching",     "cat":"Fisik Harian", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"pushup_awal", "name":"Push Up Awal",   "cat":"Fisik Harian", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"pullup_awal", "name":"Pull Up Awal",   "cat":"Fisik Harian", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"skincare_awal","name":"Skincare Awal", "cat":"Fisik Harian", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"pushup_akhir","name":"Push Up Akhir",  "cat":"Fisik Harian", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"pullup_akhir","name":"Pull Up Akhir",  "cat":"Fisik Harian", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"plank",       "name":"Plank",          "cat":"Fisik Harian", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"skincare_akhir","name":"Skincare Akhir","cat":"Fisik Harian","hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"minum",       "name":"Minum 2 Liter",  "cat":"Fisik Harian", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"makan",       "name":"Makan Bergizi",  "cat":"Fisik Harian", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"tidur",       "name":"Tidur 7 Jam",    "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"stretching",  "name":"Stretching",     "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"pushup_awal", "name":"Push Up Awal",   "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"pullup_awal", "name":"Pull Up Awal",   "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"skincare_awal","name":"Skincare Awal", "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"pushup_akhir","name":"Push Up Akhir",  "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"pullup_akhir","name":"Pull Up Akhir",  "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"plank",       "name":"Plank",          "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"skincare_akhir","name":"Skincare Akhir","cat":"Fisik","hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"minum",       "name":"Minum 2 Liter",  "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
+    {"id":"makan",       "name":"Makan Bergizi",  "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
 
     # ── Skill & Knowledge ─────────────────────────────────────────────────────
-    {"id":"kuliah",  "name":"Kuliah 1 Jam",       "cat":"Skill & Knowledge", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
-    {"id":"projek",  "name":"Projek 1 Jam",       "cat":"Skill & Knowledge", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
-    {"id":"video",   "name":"1 Video Ilmu",        "cat":"Skill & Knowledge", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
+    {"id":"kuliah",  "name":"Kuliah 1 Jam",       "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
+    {"id":"projek",  "name":"Projek 1 Jam",       "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
+    {"id":"video",   "name":"1 Video Ilmu",        "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
 
     # ── Finance ───────────────────────────────────────────────────────────────
     {"id":"pengeluaran_sesuai","name":"Pengeluaran Sesuai Budget","cat":"Finance","hp":0,"exp":5,"hp_pen":0,"exp_pen":1},
@@ -56,7 +56,7 @@ DEFAULT_HABITS: list[dict] = [
 ]
 
 # Urutan render kategori di tab harian
-HABIT_CATEGORY_ORDER = ["Faith", "Fisik Harian", "Skill & Knowledge", "Finance", "Evaluasi", "Custom"]
+HABIT_CATEGORY_ORDER = ["Faith", "Fisik", "Skill", "Finance", "Evaluasi", "Custom"]
 
 # ── WEEKLY MISSIONS ───────────────────────────────────────────────────────────
 # Misi: reward +50 HP +20 kupon jika terceklis
@@ -308,8 +308,8 @@ def process_daily_reset(data: dict) -> dict[str, Any]:
     summary["exp_delta"] = exp_delta
     summary["streak"]    = data["streak"]
 
-    # Tandai reset tanpa menghapus history checklist harian.
-    data["last_date"] = today_key
+    # ── Reset checklist hari ini ──────────────────────────────────────────────
+    data["habits"][today_key] = {}
 
     return summary
 
@@ -337,9 +337,9 @@ def process_weekly_reset(data: dict) -> dict[str, Any]:
     summary["hp_delta"]    = -hp_pen
     summary["kupon_delta"] = -kupon_pen
 
-    # Reset checklist minggu ini tanpa menghapus history minggu sebelumnya.
-    data.setdefault("obligations", {})[week_key] = {}
-    data.setdefault("missions", {})[week_key] = {}
+    # Reset obligations untuk minggu ini
+    if week_key in data.get("obligations", {}):
+        data["obligations"][week_key] = {}
 
     return summary
 
@@ -372,4 +372,3 @@ def check_achievements(data: dict) -> list[str]:
 
 def fmt_rp(n: int | float) -> str:
     return "Rp{:,}".format(int(n)).replace(",", ".")
-
