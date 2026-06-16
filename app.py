@@ -1,12 +1,11 @@
 """
-app.py — Habit RPG Streamlit application (v3).
+app.py — Habit RPG Streamlit application (v3 - Fixed).
 Entry point: python -m streamlit run app.py
 """
 
 import json
 import sys
 import os
-import uuid
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
@@ -15,7 +14,7 @@ from collections import defaultdict
 
 # Pastikan core.py di direktori yang sama dapat diimport
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from core import (
+from core2 import (
     load, save, import_data, default_state,
     get_level, get_all_habits, get_all_missions,
     get_today_habits, set_today_habit, get_week_key,
@@ -29,7 +28,7 @@ from core import (
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Habit RPG",
-    page_icon="sword",
+    page_icon="⚔️",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
@@ -146,7 +145,12 @@ if "D" not in st.session_state:
 if "notifications" not in st.session_state:
     st.session_state.notifications = []
 
-D = st.session_state.D
+D = st.session_state.D  # shorthand
+
+# ── AUTO DATE CHANGE ──────────────────────────────────────────────────────────
+if D.get("last_date") != str(date.today()):
+    D["last_date"] = str(date.today())
+    save(D)
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def persist() -> None:
@@ -161,8 +165,7 @@ def show_notifications() -> None:
     st.session_state.notifications = []
 
 def render_stat_bar(value: int, ref: int, color: str) -> str:
-    """Render HTML progress bar. ref = nilai referensi untuk % tampilan."""
-    pct = max(0, min(100, int((value / ref) * 100))) if ref > 0 else 0
+    pct = min(100, int((value / ref) * 100)) if ref > 0 else 0
     return (f'<div class="stat-bar-wrap">'
             f'<div class="stat-bar-fill" style="width:{pct}%;background:{color}"></div>'
             f'</div>')
@@ -182,19 +185,6 @@ def build_heatmap() -> list[tuple[date, str]]:
         result.append((d, COLOR.get(D["week_days"].get(str(d), "none"), "#1a1a2e")))
     return result
 
-# ── AUTO DATE CHANGE & MISSED DAY AUTO-RESET ──────────────────────────────────
-today_str = str(date.today())
-last_d = D.get("last_date")
-
-if last_d and last_d != today_str:
-    # Auto-evaluasi & penalti jika user terlewat login di hari sebelumnya
-    if D.get("last_reset") != last_d:
-        auto_summary = process_daily_reset(D, target_date=last_d)
-        notify(f"Auto-reset missed day ({last_d}): HP {auto_summary['hp_delta']}, EXP {auto_summary['exp_delta']}")
-    
-    D["last_date"] = today_str
-    save(D)
-
 show_notifications()
 
 # ── TABS ──────────────────────────────────────────────────────────────────────
@@ -208,19 +198,24 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("Shift Pagi", type="primary" if D["shift"]=="Pagi" else "secondary", use_container_width=True):
+        if st.button("Shift Pagi",
+                     type="primary" if D["shift"]=="Pagi" else "secondary",
+                     use_container_width=True):
             D["shift"] = "Pagi"; persist(); st.rerun()
     with c2:
-        if st.button("Shift Malam", type="primary" if D["shift"]=="Malam" else "secondary", use_container_width=True):
+        if st.button("Shift Malam",
+                     type="primary" if D["shift"]=="Malam" else "secondary",
+                     use_container_width=True):
             D["shift"] = "Malam"; persist(); st.rerun()
 
     st.caption(f"**{D['shift']}** | {date.today().strftime('%A, %d %B %Y')}")
 
-    # Character card
+    # ── Character card ────────────────────────────────────────────────────────
     cur_lv, nxt_lv, total_stat = get_level(D["hp"], D["exp"])
     pct_lv = 0.0
     if nxt_lv:
-        pct_lv = max(0.0, min(1.0, (total_stat - cur_lv["threshold"]) / (nxt_lv["threshold"] - cur_lv["threshold"])))
+        pct_lv = min(1.0, (total_stat - cur_lv["threshold"])
+                          / (nxt_lv["threshold"] - cur_lv["threshold"]))
 
     nxt_label = (f"Total: {total_stat} / {nxt_lv['threshold']} → Level {nxt_lv['level']}"
                  if nxt_lv else "Level Maksimal!")
@@ -233,7 +228,7 @@ with tab1:
     if nxt_lv:
         st.progress(pct_lv)
 
-    # Stat cards
+    # ── Stat cards ────────────────────────────────────────────────────────────
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("HP",    D["hp"])
     s2.metric("EXP",   D["exp"])
@@ -249,7 +244,7 @@ with tab1:
 
     st.divider()
 
-    # Habit checklist
+    # ── Habit checklist ───────────────────────────────────────────────────────
     today_habits = get_today_habits(D)
     all_habits   = get_all_habits(D)
 
@@ -279,28 +274,26 @@ with tab1:
                 persist()
                 st.rerun()
 
-    # Custom habit manager
+    # ── Custom habit manager (FIXED LAYOUT & MULTIPLE COLUMNS) ────────────────
     with st.expander("Tambah / Hapus Habit Custom"):
         nc1, nc2, nc3 = st.columns([2, 1, 1])
-        new_name = nc1.text_input("Nama", key="nh_name", label_visibility="collapsed", placeholder="Nama habit")
-        new_hp   = nc2.number_input("HP",  min_value=0, max_value=50, value=5, key="nh_hp",  label_visibility="collapsed")
-        new_exp  = nc3.number_input("EXP", min_value=0, max_value=50, value=0, key="nh_exp", label_visibility="collapsed")
-        new_hp_pen  = nc2.number_input("Pen HP",  min_value=0, max_value=20, value=3, key="nh_hpen", label_visibility="collapsed")
-        new_exp_pen = nc3.number_input("Pen EXP", min_value=0, max_value=20, value=1, key="nh_epen", label_visibility="collapsed")
+        new_name = nc1.text_input("Nama Habit", label_visibility="collapsed", placeholder="Nama habit", key="nh_name")
+        new_hp   = nc2.number_input("Reward HP", min_value=0, max_value=50, value=5, key="nh_hp")
+        new_exp  = nc3.number_input("Reward EXP", min_value=0, max_value=50, value=0, key="nh_exp")
+        
+        nc4, nc5 = st.columns([2, 2])
+        new_hp_pen  = nc4.number_input("Penalti HP jika skip", min_value=0, max_value=20, value=3, key="nh_hpen")
+        new_exp_pen = nc5.number_input("Penalti EXP jika skip", min_value=0, max_value=20, value=1, key="nh_epen")
 
-        if st.button("Tambah Habit", key="btn_add_habit"):
+        if st.button("Tambah Habit", key="btn_add_habit", use_container_width=True):
             name = new_name.strip()
             if name:
-                hid = f"custom_{uuid.uuid4().hex[:8]}"
-                D.setdefault("custom_habits", []).append({
+                hid = f"custom_{name.lower().replace(' ','_')}_{len(D['custom_habits'])}"
+                D["custom_habits"].append({
                     "id": hid, "name": name, "cat": "Custom",
                     "hp": int(new_hp),  "exp": int(new_exp),
                     "hp_pen": int(new_hp_pen), "exp_pen": int(new_exp_pen),
                 })
-                # Clear session state keys
-                for k in ["nh_name", "nh_hp", "nh_exp", "nh_hpen", "nh_epen"]:
-                    st.session_state.pop(k, None)
-                    
                 persist()
                 st.success(f"Habit '{name}' ditambahkan!")
                 st.rerun()
@@ -309,43 +302,47 @@ with tab1:
 
         for i, ch in enumerate(D.get("custom_habits", [])):
             ch_c, ch_d = st.columns([4, 1])
-            ch_c.markdown(f"`{ch['name']}` +{ch.get('hp',0)} HP +{ch.get('exp',0)} EXP")
-            if ch_d.button("Hapus", key=f"del_h_{ch['id']}"):
+            ch_c.markdown(f"`{ch['name']}` +{ch.get('hp',0)} HP | +{ch.get('exp',0)} EXP")
+            if ch_d.button("Hapus", key=f"del_h_{i}"):
                 D["custom_habits"].pop(i)
                 persist()
                 st.rerun()
 
     st.divider()
 
-    # Tombol Reset Hari Baru
+    # ── Tombol Reset Hari Baru ────────────────────────────────────────────────
     if st.button("Reset Hari Baru", use_container_width=True, type="primary"):
         prev_lv = get_level(D["hp"], D["exp"])[0]["level"]
+
         summary = process_daily_reset(st.session_state.D)
 
-        if "sudah direset" in "".join(summary.get("messages", [])):
-            st.info(summary["messages"][0])
-        else:
-            new_lv = get_level(st.session_state.D["hp"], st.session_state.D["exp"])[0]
-            if new_lv["level"] > prev_lv:
-                st.session_state.D["level_history"].append({
-                    "level": new_lv["level"], "name": new_lv["name"], "date": str(date.today())
-                })
-                st.session_state["levelup_banner"] = new_lv["level"]
+        new_lv = get_level(st.session_state.D["hp"], st.session_state.D["exp"])[0]
+        if new_lv["level"] > prev_lv:
+            st.session_state.D["level_history"].append({
+                "level": new_lv["level"], "name": new_lv["name"],
+                "date": str(date.today())
+            })
+            st.session_state["levelup_banner"] = new_lv["level"]
 
-            for aid in check_achievements(st.session_state.D):
-                ach = next((a for a in ACHIEVEMENTS if a["id"] == aid), None)
-                if ach: notify(f"{ach['icon']} Achievement: {ach['name']}!")
+        for aid in check_achievements(st.session_state.D):
+            ach = next((a for a in ACHIEVEMENTS if a["id"] == aid), None)
+            if ach:
+                notify(f"{ach['icon']} Achievement: {ach['name']}!")
 
-            for msg in summary.get("messages", []):
-                notify(msg)
+        for msg in summary.get("messages", []):
+            notify(msg)
 
-            persist()
-            delta_hp  = summary["hp_delta"]
-            delta_exp = summary["exp_delta"]
-            sign_hp   = "+" if delta_hp  >= 0 else ""
-            sign_exp  = "+" if delta_exp >= 0 else ""
-            st.success(f"Hari direset! HP {sign_hp}{delta_hp} | EXP {sign_exp}{delta_exp} | Streak: {st.session_state.D['streak']} hari")
-            st.rerun()
+        persist()
+
+        delta_hp  = summary["hp_delta"]
+        delta_exp = summary["exp_delta"]
+        sign_hp   = "+" if delta_hp  >= 0 else ""
+        sign_exp  = "+" if delta_exp >= 0 else ""
+        st.success(
+            f"Hari direset! HP {sign_hp}{delta_hp} | EXP {sign_exp}{delta_exp} | "
+            f"Streak: {st.session_state.D['streak']} hari"
+        )
+        st.rerun()
 
     if st.session_state.get("levelup_banner"):
         lv = st.session_state.levelup_banner
@@ -366,26 +363,23 @@ with tab2:
     st.caption("1 Gold = Rp1.000")
     st.divider()
 
-    # Pemasukan
     st.markdown('<div class="sec">Catat Pendapatan</div>', unsafe_allow_html=True)
     ca, cb = st.columns([2, 1])
-    inc_amt  = ca.number_input("inc_amt", min_value=0, step=1000, label_visibility="collapsed", placeholder="Nominal (Rp)", key="inc_amt")
-    inc_desc = cb.text_input("inc_desc", label_visibility="collapsed", placeholder="Keterangan", key="inc_desc")
-    
+    inc_amt  = ca.number_input("Nominal Pemasukan (Rp)", min_value=0, step=1000, key="inc_amt")
+    inc_desc = cb.text_input("Keterangan Pemasukan", placeholder="Keterangan", key="inc_desc")
     if st.button("Catat Pemasukan", use_container_width=True):
         if inc_amt > 0:
             g = round(inc_amt / 1000)
             st.session_state.D["gold"] += g
             st.session_state.D["transactions"].insert(0, {
                 "type":"in", "desc": inc_desc or "Pendapatan",
-                "amt": int(inc_amt), "gold": g, "date": str(date.today()), "time": datetime.now().strftime("%H:%M"),
+                "amt": int(inc_amt), "gold": g,
+                "date": str(date.today()),
+                "time": datetime.now().strftime("%H:%M"),
             })
             for aid in check_achievements(st.session_state.D):
                 ach = next((a for a in ACHIEVEMENTS if a["id"] == aid), None)
                 if ach: notify(f"{ach['icon']} Achievement: {ach['name']}!")
-            
-            st.session_state.pop("inc_amt", None)
-            st.session_state.pop("inc_desc", None)
             persist()
             notify(f"+{g} Gold masuk!")
             st.rerun()
@@ -394,23 +388,20 @@ with tab2:
 
     st.divider()
 
-    # Pengeluaran
     st.markdown('<div class="sec">Catat Pengeluaran</div>', unsafe_allow_html=True)
     cc, cd = st.columns([2, 1])
-    exp_amt = cc.number_input("exp_amt", min_value=0, step=1000, label_visibility="collapsed", placeholder="Nominal (Rp)", key="exp_amt")
-    exp_cat = cd.selectbox("exp_cat", EXPENSE_CATS, label_visibility="collapsed", key="exp_cat")
-    
+    exp_amt = cc.number_input("Nominal Pengeluaran (Rp)", min_value=0, step=1000, key="exp_amt")
+    exp_cat = cd.selectbox("Kategori Pengeluaran", EXPENSE_CATS, key="exp_cat")
     if st.button("Catat Pengeluaran", use_container_width=True):
         if exp_amt > 0:
             g = round(exp_amt / 1000)
             st.session_state.D["gold"] = max(0, st.session_state.D["gold"] - g)
             st.session_state.D["transactions"].insert(0, {
                 "type":"out", "desc": exp_cat,
-                "amt": int(exp_amt), "gold": g, "date": str(date.today()), "time": datetime.now().strftime("%H:%M"),
+                "amt": int(exp_amt), "gold": g,
+                "date": str(date.today()),
+                "time": datetime.now().strftime("%H:%M"),
             })
-            
-            st.session_state.pop("exp_amt", None)
-            st.session_state.pop("exp_cat", None)
             persist()
             notify(f"-{g} Gold ({exp_cat})")
             st.rerun()
@@ -419,21 +410,26 @@ with tab2:
 
     st.divider()
 
-    # Budget monitor
     st.markdown('<div class="sec">Monitor Budget Bulan Ini</div>', unsafe_allow_html=True)
     this_month = date.today().strftime("%Y-%m")
     for cat, budget in BUDGET.items():
-        spent = sum(t["amt"] for t in D["transactions"] if t["type"]=="out" and t.get("desc")==cat and t["date"].startswith(this_month))
-        pct   = max(0.0, min(1.0, spent / budget)) if budget > 0 else 0.0
+        spent = sum(
+            t["amt"] for t in D["transactions"]
+            if t["type"]=="out" and t.get("desc")==cat and t["date"].startswith(this_month)
+        )
+        pct   = min(1.0, spent / budget) if budget > 0 else 0.0
         icon  = "🔴" if spent > budget else "🟢"
         bc1, bc2 = st.columns([3, 1])
         bc1.markdown(f"{icon} **{cat}**")
-        bc2.markdown(f"<div style='text-align:right;font-size:13px'>{fmt_rp(spent)} / {fmt_rp(budget)}</div>", unsafe_allow_html=True)
+        bc2.markdown(
+            f"<div style='text-align:right;font-size:13px'>{fmt_rp(spent)} / {fmt_rp(budget)}</div>",
+            unsafe_allow_html=True
+        )
         st.progress(pct)
 
     st.divider()
     st.markdown('<div class="sec">Grafik Pengeluaran Bulan Ini</div>', unsafe_allow_html=True)
-    cat_totals: dict[str, int] = defaultdict(int)
+    cat_totals = defaultdict(int)
     for t in D["transactions"]:
         if t["type"]=="out" and t["date"].startswith(this_month):
             cat_totals[t.get("desc","Lainnya")] += t["amt"]
@@ -442,11 +438,16 @@ with tab2:
         n_colors = max(len(cat_totals), 1)
         colors   = px.colors.sequential.Purples[-n_colors:] if n_colors <= 9 else px.colors.sequential.Purples
         fig_pie = go.Figure(go.Pie(
-            labels=list(cat_totals.keys()), values=list(cat_totals.values()), hole=0.45,
-            marker=dict(colors=colors), textinfo="label+percent", textfont=dict(color="#e0e0f0", size=12),
+            labels=list(cat_totals.keys()),
+            values=list(cat_totals.values()),
+            hole=0.45,
+            marker=dict(colors=colors),
+            textinfo="label+percent",
+            textfont=dict(color="#e0e0f0", size=12),
         ))
         fig_pie.update_layout(
-            paper_bgcolor="#0f0f1a", plot_bgcolor="#0f0f1a", font=dict(color="#e0e0f0"), showlegend=False,
+            paper_bgcolor="#0f0f1a", plot_bgcolor="#0f0f1a",
+            font=dict(color="#e0e0f0"), showlegend=False,
             margin=dict(t=20, b=20, l=20, r=20), height=280
         )
         st.plotly_chart(fig_pie, use_container_width=True)
@@ -474,8 +475,8 @@ with tab2:
 with tab3:
     st.markdown('<div class="sec">Heatmap Konsistensi (12 Minggu)</div>', unsafe_allow_html=True)
     hmap = build_heatmap()
-    weeks: list[list] = []
-    cur_week: list    = []
+    weeks = []
+    cur_week = []
     for d_obj, color in hmap:
         if d_obj.weekday() == 0 and cur_week:
             weeks.append(cur_week)
@@ -496,8 +497,8 @@ with tab3:
     st.divider()
 
     sc1, sc2, sc3 = st.columns(3)
-    sc1.metric("Streak Harian",  f"{D.get('streak', 0)} hari")
-    sc2.metric("Streak Terbaik", f"{D.get('best_streak', 0)} hari")
+    sc1.metric("Streak Harian",  f"{D['streak']} hari")
+    sc2.metric("Streak Terbaik", f"{D['best_streak']} hari")
     sc3.metric("Faith Streak",   f"{D.get('faith_streak', 0)} hari")
     st.caption("Reward: 3 hari +30 | 7 hari +75 | 30 hari +300 | Faith 7 hari +50 kupon")
 
@@ -513,7 +514,10 @@ with tab3:
         hp_r     = m.get("hp", 50)
         k_r      = m.get("kupon", 20)
 
-        new_val = st.checkbox(f"{m['name']}   `+{hp_r} HP  +{k_r} kupon`", value=done_now, key=f"mis_{mk}")
+        new_val = st.checkbox(
+            f"{m['name']}   `+{hp_r} HP  +{k_r} kupon`",
+            value=done_now, key=f"mis_{mk}"
+        )
         if new_val != done_now:
             D["missions"][mk] = new_val
             if new_val:
@@ -528,20 +532,18 @@ with tab3:
 
     with st.expander("Tambah / Hapus Misi Custom"):
         nm1, nm2, nm3 = st.columns([2, 1, 1])
-        m_name  = nm1.text_input("m_name", label_visibility="collapsed", placeholder="Nama misi", key="new_m_name")
-        m_hp    = nm2.number_input("m_hp", min_value=0, max_value=200, value=50, label_visibility="collapsed", key="new_m_hp")
-        m_kupon = nm3.number_input("m_kupon", min_value=0, max_value=200, value=20, label_visibility="collapsed", key="new_m_kupon")
-        
-        if st.button("Tambah Misi", key="btn_add_m"):
+        m_name  = nm1.text_input("Nama Misi Custom", placeholder="Nama misi", key="new_m_name")
+        m_hp    = nm2.number_input("Misi HP", min_value=0, max_value=200, value=50, key="new_m_hp")
+        m_kupon = nm3.number_input("Misi Kupon", min_value=0, max_value=200, value=20, key="new_m_kupon")
+        if st.button("Tambah Misi", key="btn_add_m", use_container_width=True):
             name = m_name.strip()
             if name:
-                mid = f"custom_m_{uuid.uuid4().hex[:8]}"
+                mid = f"custom_m_{name.lower().replace(' ','_')}_{len(D.get('custom_missions',[]))}"
                 D.setdefault("custom_missions", []).append({
-                    "id": mid, "name": name, "hp": int(m_hp), "exp": 0, "kupon": int(m_kupon), "type": "misi"
+                    "id": mid, "name": name,
+                    "hp": int(m_hp), "exp": 0, "kupon": int(m_kupon),
+                    "type": "misi"
                 })
-                st.session_state.pop("new_m_name", None)
-                st.session_state.pop("new_m_hp", None)
-                st.session_state.pop("new_m_kupon", None)
                 persist()
                 st.success(f"Misi '{name}' ditambahkan!")
                 st.rerun()
@@ -550,20 +552,24 @@ with tab3:
 
         for i, cm in enumerate(D.get("custom_missions", [])):
             cmc, cmd = st.columns([4, 1])
-            cmc.markdown(f"`{cm['name']}` +{cm['hp']} HP +{cm['kupon']} kupon")
-            if cmd.button("Hapus", key=f"del_m_{cm['id']}"):
+            cmc.markdown(f"`{cm['name']}` +{cm['hp']} HP | +{cm['kupon']} kupon")
+            if cmd.button("Hapus", key=f"del_m_{i}"):
                 D["custom_missions"].pop(i)
                 persist()
                 st.rerun()
 
     st.divider()
 
-    st.markdown('<div class="sec">Kewajiban Mingguan (-30 HP -20 kupon jika tidak selesai)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec">Kewajiban Mingguan (-30 HP -20 kupon jika tidak selesai)</div>',
+                unsafe_allow_html=True)
     D.setdefault("obligations", {}).setdefault(week_key, {})
 
     for ob in DEFAULT_OBLIGATIONS:
         ob_done = D["obligations"][week_key].get(ob["id"], False)
-        new_ob  = st.checkbox(f"{ob['name']}   `Penalti: -{ob['pen_hp']} HP  -{ob['pen_kupon']} kupon`", value=ob_done, key=f"ob_{week_key}_{ob['id']}")
+        new_ob  = st.checkbox(
+            f"{ob['name']}   `Penalti: -{ob['pen_hp']} HP  -{ob['pen_kupon']} kupon`",
+            value=ob_done, key=f"ob_{week_key}_{ob['id']}"
+        )
         if new_ob != ob_done:
             D["obligations"][week_key][ob["id"]] = new_ob
             persist()
@@ -580,15 +586,22 @@ with tab3:
     })
     mt = D["monthly_targets"][month_key]
     faith_ids = ["subuh","dzuhur","asyar","magrib","isya"]
-    mt["kuliah"]["current"] = sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_key) and dh.get("kuliah", False))
-    mt["fisik"]["current"]  = sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_key) and all(dh.get(fid, False) for fid in ["pushup_awal","pullup_awal","plank"]))
-    mt["faith"]["current"]  = sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_key) and all(dh.get(fid, False) for fid in faith_ids))
-    
+    mt["kuliah"]["current"] = sum(1 for ds, dh in D["habits"].items()
+                                  if ds.startswith(month_key) and dh.get("kuliah", False))
+    mt["fisik"]["current"]  = sum(1 for ds, dh in D["habits"].items()
+                                  if ds.startswith(month_key)
+                                  and all(dh.get(fid, False) for fid in ["pushup_awal","pullup_awal","plank"]))
+    mt["faith"]["current"]  = sum(1 for ds, dh in D["habits"].items()
+                                  if ds.startswith(month_key)
+                                  and all(dh.get(fid, False) for fid in faith_ids))
     for tid, t in mt.items():
-        pct_t = max(0.0, min(1.0, t["current"] / t["target"])) if t["target"] > 0 else 0.0
+        pct_t = min(1.0, t["current"] / t["target"]) if t["target"] > 0 else 0
         tc1, tc2 = st.columns([3, 1])
         tc1.markdown(f"**{t['label']}**")
-        tc2.markdown(f"<div style='text-align:right;font-size:13px;color:#a78bfa'>{t['current']} / {t['target']}</div>", unsafe_allow_html=True)
+        tc2.markdown(
+            f"<div style='text-align:right;font-size:13px;color:#a78bfa'>{t['current']} / {t['target']}</div>",
+            unsafe_allow_html=True
+        )
         st.progress(pct_t)
     persist()
 
@@ -597,16 +610,15 @@ with tab3:
     if st.button("Reset Minggu Baru", use_container_width=True, type="primary"):
         summary_w = process_weekly_reset(st.session_state.D)
         persist()
-        
-        if "sudah direset" in "".join(summary_w.get("messages", [])):
-            st.info(summary_w["messages"][0])
+        if summary_w["messages"]:
+            for msg in summary_w["messages"]:
+                notify(msg)
+            st.warning(
+                f"Minggu direset. Total penalti: {summary_w['hp_delta']} HP, "
+                f"{summary_w['kupon_delta']} kupon"
+            )
         else:
-            if summary_w["messages"]:
-                for msg in summary_w["messages"]:
-                    notify(msg)
-                st.warning(f"Minggu direset. Total penalti: {summary_w['hp_delta']} HP, {summary_w['kupon_delta']} kupon")
-            else:
-                st.success("Semua kewajiban selesai! Tidak ada penalti minggu ini.")
+            st.success("Semua kewajiban selesai! Tidak ada penalti minggu ini.")
         st.rerun()
 
 # =============================================================================
@@ -641,7 +653,8 @@ with tab4:
     st.markdown('<div class="sec">Frekuensi Habit Bulan Ini</div>', unsafe_allow_html=True)
     month_now = date.today().strftime("%Y-%m")
     h_counts  = {
-        h["name"]: sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_now) and dh.get(h["id"], False))
+        h["name"]: sum(1 for ds, dh in D["habits"].items()
+                       if ds.startswith(month_now) and dh.get(h["id"], False))
         for h in get_all_habits(D)
     }
     h_counts = {k: v for k, v in h_counts.items() if v > 0}
@@ -649,14 +662,19 @@ with tab4:
     if h_counts:
         sorted_h = sorted(h_counts.items(), key=lambda x: x[1], reverse=True)
         fig_h = go.Figure(go.Bar(
-            x=[x[1] for x in sorted_h], y=[x[0] for x in sorted_h], orientation="h",
-            marker=dict(color=[x[1] for x in sorted_h], colorscale=[[0,"#2a1a4a"],[1,"#7c3aed"]], line=dict(width=0)),
-            text=[x[1] for x in sorted_h], textposition="outside", textfont=dict(color="#a78bfa")
+            x=[x[1] for x in sorted_h], y=[x[0] for x in sorted_h],
+            orientation="h",
+            marker=dict(color=[x[1] for x in sorted_h],
+                        colorscale=[[0,"#2a1a4a"],[1,"#7c3aed"]], line=dict(width=0)),
+            text=[x[1] for x in sorted_h], textposition="outside",
+            textfont=dict(color="#a78bfa")
         ))
         fig_h.update_layout(
             paper_bgcolor="#0f0f1a", plot_bgcolor="#0f0f1a", font=dict(color="#e0e0f0"),
-            xaxis=dict(gridcolor="#1e1e35", color="#888"), yaxis=dict(color="#c0c0d8", autorange="reversed"),
-            margin=dict(t=10,b=20,l=10,r=40), height=max(200, len(sorted_h) * 28)
+            xaxis=dict(gridcolor="#1e1e35", color="#888"),
+            yaxis=dict(color="#c0c0d8", autorange="reversed"),
+            margin=dict(t=10,b=20,l=10,r=40),
+            height=max(200, len(sorted_h) * 28)
         )
         st.plotly_chart(fig_h, use_container_width=True)
     else:
@@ -664,7 +682,7 @@ with tab4:
 
     st.divider()
     st.markdown('<div class="sec">Tren Gold (30 Hari Terakhir)</div>', unsafe_allow_html=True)
-    gold_by_day: dict[str, int] = defaultdict(int)
+    gold_by_day = defaultdict(int)
     for t in D["transactions"]:
         gold_by_day[t["date"]] += t["gold"] if t["type"]=="in" else -t["gold"]
 
@@ -675,7 +693,8 @@ with tab4:
         gold_series.append(cumulative)
 
     fig_gold = go.Figure(go.Scatter(
-        x=[str(d) for d in last30], y=gold_series, fill="tozeroy", fillcolor="rgba(124,58,237,0.15)",
+        x=[str(d) for d in last30], y=gold_series,
+        fill="tozeroy", fillcolor="rgba(124,58,237,0.15)",
         line=dict(color="#a78bfa", width=2), mode="lines"
     ))
     fig_gold.update_layout(
@@ -713,6 +732,7 @@ with tab5:
             st.markdown(f"{icon} **Level {lh['level']} — {lh.get('name','')}** · `{lh['date']}`")
 
     st.divider()
+
     st.markdown('<div class="sec">Achievements</div>', unsafe_allow_html=True)
     unlocked = set(D.get("achievements", []))
     st.caption(f"{len(unlocked)} / {len(ACHIEVEMENTS)} unlocked")
@@ -732,6 +752,7 @@ with tab5:
         </div>""", unsafe_allow_html=True)
 
     st.divider()
+
     st.markdown('<div class="sec">Tukar Kupon Reward</div>', unsafe_allow_html=True)
     ck1, ck2 = st.columns(2)
     for i, c in enumerate(COUPONS):
