@@ -1,5 +1,5 @@
 """
-app.py — Habit RPG Streamlit application (v3 - Fixed).
+app.py — Habit RPG Streamlit application (v3).
 Entry point: python -m streamlit run app.py
 """
 
@@ -14,7 +14,7 @@ from collections import defaultdict
 
 # Pastikan core.py di direktori yang sama dapat diimport
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from core2 import (
+from core import (
     load, save, import_data, default_state,
     get_level, get_all_habits, get_all_missions,
     get_today_habits, set_today_habit, get_week_key,
@@ -145,7 +145,7 @@ if "D" not in st.session_state:
 if "notifications" not in st.session_state:
     st.session_state.notifications = []
 
-D = st.session_state.D  # shorthand
+D = st.session_state.D  # shorthand — dict mutable, perubahan langsung masuk session
 
 # ── AUTO DATE CHANGE ──────────────────────────────────────────────────────────
 if D.get("last_date") != str(date.today()):
@@ -165,12 +165,14 @@ def show_notifications() -> None:
     st.session_state.notifications = []
 
 def render_stat_bar(value: int, ref: int, color: str) -> str:
+    """Render HTML progress bar. ref = nilai referensi untuk % tampilan."""
     pct = min(100, int((value / ref) * 100)) if ref > 0 else 0
     return (f'<div class="stat-bar-wrap">'
             f'<div class="stat-bar-fill" style="width:{pct}%;background:{color}"></div>'
             f'</div>')
 
 def habit_month_count(habit_id: str) -> int:
+    """Hitung berapa kali habit dilakukan bulan ini dari history harian."""
     m = date.today().strftime("%Y-%m")
     return sum(
         1 for ds, dh in D.get("habits", {}).items()
@@ -178,6 +180,7 @@ def habit_month_count(habit_id: str) -> int:
     )
 
 def build_heatmap() -> list[tuple[date, str]]:
+    """Build list (date, color) untuk 12 minggu terakhir."""
     COLOR = {"done":"#7c3aed","partial":"#4a2a7a","miss":"#3a1a1a","none":"#1a1a2e"}
     result = []
     for i in range(84):
@@ -196,6 +199,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # TAB 1 — HARIAN
 # =============================================================================
 with tab1:
+    # ── Shift toggle ──────────────────────────────────────────────────────────
     c1, c2 = st.columns(2)
     with c1:
         if st.button("Shift Pagi",
@@ -235,6 +239,7 @@ with tab1:
     s3.metric("Gold",  D["gold"])
     s4.metric("Kupon", D["kupon"])
 
+    # Visual stat bars (HP relatif terhadap 200 karena sudah tidak ada max)
     st.markdown(
         render_stat_bar(D["hp"],  max(D["hp"], 200),  "#ef4444") +
         render_stat_bar(D["exp"] % 500 or 1, 500,     "#8b5cf6") +
@@ -244,7 +249,7 @@ with tab1:
 
     st.divider()
 
-    # ── Habit checklist ───────────────────────────────────────────────────────
+    # ── Habit checklist (hanya simpan state, poin dihitung saat reset) ───────
     today_habits = get_today_habits(D)
     all_habits   = get_all_habits(D)
 
@@ -256,6 +261,7 @@ with tab1:
 
         for h in cat_habits:
             done_now  = today_habits.get(h["id"], False)
+            # Label: nama + reward/penalti + frekuensi bulan ini
             hp_r  = h.get("hp",  h.get("hp_reward",  0))
             exp_r = h.get("exp", h.get("exp_reward", 0))
             hp_p  = h.get("hp_pen",  0)
@@ -268,24 +274,28 @@ with tab1:
             mc    = habit_month_count(h["id"])
             label = f"{h['name']}  `{'  |  '.join(pts)}`  · *{mc}x bulan ini*"
 
+            # Checkbox — HANYA simpan state, tidak ubah stat
             new_val = st.checkbox(label, value=done_now, key=f"cb_{h['id']}")
             if new_val != done_now:
                 set_today_habit(D, h["id"], new_val)
                 persist()
                 st.rerun()
 
-    # ── Custom habit manager (FIXED LAYOUT & MULTIPLE COLUMNS) ────────────────
+    # ── Custom habit manager ──────────────────────────────────────────────────
     with st.expander("Tambah / Hapus Habit Custom"):
         nc1, nc2, nc3 = st.columns([2, 1, 1])
-        new_name = nc1.text_input("Nama Habit", label_visibility="collapsed", placeholder="Nama habit", key="nh_name")
-        new_hp   = nc2.number_input("Reward HP", min_value=0, max_value=50, value=5, key="nh_hp")
-        new_exp  = nc3.number_input("Reward EXP", min_value=0, max_value=50, value=0, key="nh_exp")
-        
-        nc4, nc5 = st.columns([2, 2])
-        new_hp_pen  = nc4.number_input("Penalti HP jika skip", min_value=0, max_value=20, value=3, key="nh_hpen")
-        new_exp_pen = nc5.number_input("Penalti EXP jika skip", min_value=0, max_value=20, value=1, key="nh_epen")
+        new_name = nc1.text_input("Nama", key="nh_name",
+                                  label_visibility="collapsed", placeholder="Nama habit")
+        new_hp   = nc2.number_input("HP",  min_value=0, max_value=50, value=5,
+                                    key="nh_hp",  label_visibility="collapsed")
+        new_exp  = nc3.number_input("EXP", min_value=0, max_value=50, value=0,
+                                    key="nh_exp", label_visibility="collapsed")
+        new_hp_pen  = nc2.number_input("Pen HP",  min_value=0, max_value=20, value=3,
+                                       key="nh_hpen", label_visibility="collapsed")
+        new_exp_pen = nc3.number_input("Pen EXP", min_value=0, max_value=20, value=1,
+                                       key="nh_epen", label_visibility="collapsed")
 
-        if st.button("Tambah Habit", key="btn_add_habit", use_container_width=True):
+        if st.button("Tambah Habit", key="btn_add_habit"):
             name = new_name.strip()
             if name:
                 hid = f"custom_{name.lower().replace(' ','_')}_{len(D['custom_habits'])}"
@@ -302,7 +312,7 @@ with tab1:
 
         for i, ch in enumerate(D.get("custom_habits", [])):
             ch_c, ch_d = st.columns([4, 1])
-            ch_c.markdown(f"`{ch['name']}` +{ch.get('hp',0)} HP | +{ch.get('exp',0)} EXP")
+            ch_c.markdown(f"`{ch['name']}` +{ch.get('hp',0)} HP +{ch.get('exp',0)} EXP")
             if ch_d.button("Hapus", key=f"del_h_{i}"):
                 D["custom_habits"].pop(i)
                 persist()
@@ -314,8 +324,10 @@ with tab1:
     if st.button("Reset Hari Baru", use_container_width=True, type="primary"):
         prev_lv = get_level(D["hp"], D["exp"])[0]["level"]
 
+        # Proses semua reward/penalti di core.py
         summary = process_daily_reset(st.session_state.D)
 
+        # Cek level up setelah stat berubah
         new_lv = get_level(st.session_state.D["hp"], st.session_state.D["exp"])[0]
         if new_lv["level"] > prev_lv:
             st.session_state.D["level_history"].append({
@@ -324,6 +336,7 @@ with tab1:
             })
             st.session_state["levelup_banner"] = new_lv["level"]
 
+        # Cek achievements
         for aid in check_achievements(st.session_state.D):
             ach = next((a for a in ACHIEVEMENTS if a["id"] == aid), None)
             if ach:
@@ -344,6 +357,7 @@ with tab1:
         )
         st.rerun()
 
+    # Level up banner
     if st.session_state.get("levelup_banner"):
         lv = st.session_state.levelup_banner
         lv_info = next((l for l in LEVELS if l["level"] == lv), None)
@@ -363,10 +377,13 @@ with tab2:
     st.caption("1 Gold = Rp1.000")
     st.divider()
 
+    # Pemasukan
     st.markdown('<div class="sec">Catat Pendapatan</div>', unsafe_allow_html=True)
     ca, cb = st.columns([2, 1])
-    inc_amt  = ca.number_input("Nominal Pemasukan (Rp)", min_value=0, step=1000, key="inc_amt")
-    inc_desc = cb.text_input("Keterangan Pemasukan", placeholder="Keterangan", key="inc_desc")
+    inc_amt  = ca.number_input("inc_amt", min_value=0, step=1000,
+                               label_visibility="collapsed", placeholder="Nominal (Rp)", key="inc_amt")
+    inc_desc = cb.text_input("inc_desc", label_visibility="collapsed",
+                              placeholder="Keterangan", key="inc_desc")
     if st.button("Catat Pemasukan", use_container_width=True):
         if inc_amt > 0:
             g = round(inc_amt / 1000)
@@ -388,10 +405,13 @@ with tab2:
 
     st.divider()
 
+    # Pengeluaran
     st.markdown('<div class="sec">Catat Pengeluaran</div>', unsafe_allow_html=True)
     cc, cd = st.columns([2, 1])
-    exp_amt = cc.number_input("Nominal Pengeluaran (Rp)", min_value=0, step=1000, key="exp_amt")
-    exp_cat = cd.selectbox("Kategori Pengeluaran", EXPENSE_CATS, key="exp_cat")
+    exp_amt = cc.number_input("exp_amt", min_value=0, step=1000,
+                               label_visibility="collapsed", placeholder="Nominal (Rp)", key="exp_amt")
+    exp_cat = cd.selectbox("exp_cat", EXPENSE_CATS,
+                            label_visibility="collapsed", key="exp_cat")
     if st.button("Catat Pengeluaran", use_container_width=True):
         if exp_amt > 0:
             g = round(exp_amt / 1000)
@@ -410,6 +430,7 @@ with tab2:
 
     st.divider()
 
+    # Budget monitor
     st.markdown('<div class="sec">Monitor Budget Bulan Ini</div>', unsafe_allow_html=True)
     this_month = date.today().strftime("%Y-%m")
     for cat, budget in BUDGET.items():
@@ -427,9 +448,10 @@ with tab2:
         )
         st.progress(pct)
 
+    # Pie chart pengeluaran
     st.divider()
     st.markdown('<div class="sec">Grafik Pengeluaran Bulan Ini</div>', unsafe_allow_html=True)
-    cat_totals = defaultdict(int)
+    cat_totals: dict[str, int] = defaultdict(int)
     for t in D["transactions"]:
         if t["type"]=="out" and t["date"].startswith(this_month):
             cat_totals[t.get("desc","Lainnya")] += t["amt"]
@@ -454,6 +476,7 @@ with tab2:
     else:
         st.caption("Belum ada data pengeluaran bulan ini.")
 
+    # Riwayat transaksi
     st.divider()
     st.markdown('<div class="sec">Riwayat Transaksi</div>', unsafe_allow_html=True)
     if not D["transactions"]:
@@ -473,10 +496,12 @@ with tab2:
 # TAB 3 — MINGGUAN
 # =============================================================================
 with tab3:
+    # Heatmap GitHub-style
     st.markdown('<div class="sec">Heatmap Konsistensi (12 Minggu)</div>', unsafe_allow_html=True)
     hmap = build_heatmap()
-    weeks = []
-    cur_week = []
+    # Kelompokkan per minggu (Senin-Minggu)
+    weeks: list[list] = []
+    cur_week: list    = []
     for d_obj, color in hmap:
         if d_obj.weekday() == 0 and cur_week:
             weeks.append(cur_week)
@@ -496,6 +521,7 @@ with tab3:
 
     st.divider()
 
+    # Streak metrics
     sc1, sc2, sc3 = st.columns(3)
     sc1.metric("Streak Harian",  f"{D['streak']} hari")
     sc2.metric("Streak Terbaik", f"{D['best_streak']} hari")
@@ -504,22 +530,25 @@ with tab3:
 
     st.divider()
 
+    # ── Misi Mingguan (+50 HP +20 kupon tiap misi) ───────────────────────────
     st.markdown('<div class="sec">Misi Mingguan (+50 HP +20 kupon)</div>', unsafe_allow_html=True)
     week_key     = get_week_key()
     all_missions = get_all_missions(D)
 
     for m in all_missions:
         mk       = f"{week_key}_{m['id']}"
-        done_now = D["missions"].get(mk, False)
+        D.setdefault("missions", {}).setdefault(week_key, {})
+        done_now = D["missions"][week_key].get(m["id"], False)
         hp_r     = m.get("hp", 50)
         k_r      = m.get("kupon", 20)
 
+        # Checkbox — state disimpan, reward dihitung real-time (misi langsung terasa)
         new_val = st.checkbox(
             f"{m['name']}   `+{hp_r} HP  +{k_r} kupon`",
             value=done_now, key=f"mis_{mk}"
         )
         if new_val != done_now:
-            D["missions"][mk] = new_val
+            D["missions"][week_key][m["id"]] = new_val
             if new_val:
                 D["hp"]    += hp_r
                 D["kupon"] += k_r
@@ -530,12 +559,16 @@ with tab3:
             persist()
             st.rerun()
 
+    # Custom mission manager
     with st.expander("Tambah / Hapus Misi Custom"):
         nm1, nm2, nm3 = st.columns([2, 1, 1])
-        m_name  = nm1.text_input("Nama Misi Custom", placeholder="Nama misi", key="new_m_name")
-        m_hp    = nm2.number_input("Misi HP", min_value=0, max_value=200, value=50, key="new_m_hp")
-        m_kupon = nm3.number_input("Misi Kupon", min_value=0, max_value=200, value=20, key="new_m_kupon")
-        if st.button("Tambah Misi", key="btn_add_m", use_container_width=True):
+        m_name  = nm1.text_input("m_name",  label_visibility="collapsed",
+                                  placeholder="Nama misi", key="new_m_name")
+        m_hp    = nm2.number_input("m_hp",   min_value=0, max_value=200, value=50,
+                                   label_visibility="collapsed", key="new_m_hp")
+        m_kupon = nm3.number_input("m_kupon", min_value=0, max_value=200, value=20,
+                                   label_visibility="collapsed", key="new_m_kupon")
+        if st.button("Tambah Misi", key="btn_add_m"):
             name = m_name.strip()
             if name:
                 mid = f"custom_m_{name.lower().replace(' ','_')}_{len(D.get('custom_missions',[]))}"
@@ -552,7 +585,7 @@ with tab3:
 
         for i, cm in enumerate(D.get("custom_missions", [])):
             cmc, cmd = st.columns([4, 1])
-            cmc.markdown(f"`{cm['name']}` +{cm['hp']} HP | +{cm['kupon']} kupon")
+            cmc.markdown(f"`{cm['name']}` +{cm['hp']} HP +{cm['kupon']} kupon")
             if cmd.button("Hapus", key=f"del_m_{i}"):
                 D["custom_missions"].pop(i)
                 persist()
@@ -560,6 +593,7 @@ with tab3:
 
     st.divider()
 
+    # ── Kewajiban Mingguan (penalti saat reset minggu) ───────────────────────
     st.markdown('<div class="sec">Kewajiban Mingguan (-30 HP -20 kupon jika tidak selesai)</div>',
                 unsafe_allow_html=True)
     D.setdefault("obligations", {}).setdefault(week_key, {})
@@ -577,13 +611,17 @@ with tab3:
 
     st.divider()
 
+    # ── Target Bulanan ────────────────────────────────────────────────────────
     st.markdown('<div class="sec">Target Bulanan</div>', unsafe_allow_html=True)
     month_key = date.today().strftime("%Y-%m")
-    D.setdefault("monthly_targets", {}).setdefault(month_key, {
+    default_monthly_targets = {
         "kuliah":  {"label":"Hari kuliah",        "target":20, "current":0},
         "fisik":   {"label":"Hari fisik lengkap",  "target":20, "current":0},
         "faith":   {"label":"Hari sholat 5 waktu", "target":30, "current":0},
-    })
+    }
+    D.setdefault("monthly_targets", {}).setdefault(month_key, {})
+    for target_id, target_default in default_monthly_targets.items():
+        D["monthly_targets"][month_key].setdefault(target_id, target_default.copy())
     mt = D["monthly_targets"][month_key]
     faith_ids = ["subuh","dzuhur","asyar","magrib","isya"]
     mt["kuliah"]["current"] = sum(1 for ds, dh in D["habits"].items()
@@ -607,6 +645,7 @@ with tab3:
 
     st.divider()
 
+    # ── Tombol Reset Minggu Baru ──────────────────────────────────────────────
     if st.button("Reset Minggu Baru", use_container_width=True, type="primary"):
         summary_w = process_weekly_reset(st.session_state.D)
         persist()
@@ -625,6 +664,7 @@ with tab3:
 # TAB 4 — STATISTIK
 # =============================================================================
 with tab4:
+    # Bar chart konsistensi 8 minggu terakhir
     st.markdown('<div class="sec">Konsistensi Harian (8 Minggu)</div>', unsafe_allow_html=True)
     w_labels, w_counts = [], []
     for w in range(7, -1, -1):
@@ -649,6 +689,7 @@ with tab4:
     )
     st.plotly_chart(fig_bar, use_container_width=True)
 
+    # Habit frequency bar chart bulan ini
     st.divider()
     st.markdown('<div class="sec">Frekuensi Habit Bulan Ini</div>', unsafe_allow_html=True)
     month_now = date.today().strftime("%Y-%m")
@@ -680,9 +721,10 @@ with tab4:
     else:
         st.caption("Belum ada data habit bulan ini.")
 
+    # Gold trend 30 hari
     st.divider()
     st.markdown('<div class="sec">Tren Gold (30 Hari Terakhir)</div>', unsafe_allow_html=True)
-    gold_by_day = defaultdict(int)
+    gold_by_day: dict[str, int] = defaultdict(int)
     for t in D["transactions"]:
         gold_by_day[t["date"]] += t["gold"] if t["type"]=="in" else -t["gold"]
 
@@ -709,6 +751,7 @@ with tab4:
 # TAB 5 — REVIEW
 # =============================================================================
 with tab5:
+    # Character summary
     cur_lv3, nxt_lv3, total3 = get_level(D["hp"], D["exp"])
     st.markdown(f"""
     <div class="char-card">
@@ -723,16 +766,18 @@ with tab5:
     r3.metric("Gold",  D["gold"])
     r4.metric("Kupon", D["kupon"])
 
+    # Level history
     if D.get("level_history"):
         st.divider()
         st.markdown('<div class="sec">Riwayat Level Up</div>', unsafe_allow_html=True)
         for lh in reversed(D["level_history"]):
             lv_i = next((l for l in LEVELS if l["level"] == lh["level"]), None)
-            icon = lv_i["avatar"] if lv_i else "⭐"
+            icon = lv_i["avatar"] if lv_i else "star"
             st.markdown(f"{icon} **Level {lh['level']} — {lh.get('name','')}** · `{lh['date']}`")
 
     st.divider()
 
+    # Achievements
     st.markdown('<div class="sec">Achievements</div>', unsafe_allow_html=True)
     unlocked = set(D.get("achievements", []))
     st.caption(f"{len(unlocked)} / {len(ACHIEVEMENTS)} unlocked")
@@ -753,6 +798,7 @@ with tab5:
 
     st.divider()
 
+    # Tukar kupon
     st.markdown('<div class="sec">Tukar Kupon Reward</div>', unsafe_allow_html=True)
     ck1, ck2 = st.columns(2)
     for i, c in enumerate(COUPONS):
@@ -762,7 +808,7 @@ with tab5:
             can_redeem = kupon_now >= c["pts"]
             st.markdown(
                 f'<div class="coupon-card {"can-redeem" if can_redeem else ""}">'
-                f'<div style="font-size:20px">{"🎟️" if can_redeem else "🔒"}</div>'
+                f'<div style="font-size:20px">{"locked" if not can_redeem else "ticket"}</div>'
                 f'<div style="font-weight:600;color:{"#a78bfa" if can_redeem else "#555"};margin:4px 0">{c["name"]}</div>'
                 f'<div style="font-size:12px;color:#888">{c["pts"]} poin</div>'
                 f'<div style="font-size:13px;color:#34d399;font-weight:600">{c["value"]}</div>'
@@ -783,6 +829,7 @@ with tab5:
                 st.success(f"Kupon '{c['name']}' ditukar! Sisa: {st.session_state.D['kupon']} poin")
                 st.rerun()
 
+    # Riwayat penukaran
     st.divider()
     st.markdown('<div class="sec">Riwayat Penukaran</div>', unsafe_allow_html=True)
     rl = st.session_state.D.get("redeem_log", [])
@@ -798,8 +845,11 @@ with tab5:
             )
 
     st.divider()
+
+    # Data management
     st.markdown('<div class="sec">Data</div>', unsafe_allow_html=True)
 
+    # Export backup
     st.download_button(
         "Export Backup (JSON)",
         data=json.dumps(st.session_state.D, indent=2, ensure_ascii=False),
@@ -808,6 +858,7 @@ with tab5:
         use_container_width=True
     )
 
+    # Import / restore dari file JSON
     st.markdown("**Import / Restore Data dari File JSON:**")
     uploaded = st.file_uploader("Pilih file backup .json", type=["json"], key="import_file")
     if uploaded is not None:
@@ -824,6 +875,7 @@ with tab5:
             except Exception as e:
                 st.error(f"Gagal import: {e}")
 
+    # Reset semua data
     with st.expander("Reset Semua Data"):
         st.warning("Semua data akan dihapus permanen dan tidak bisa dikembalikan.")
         if st.button("Konfirmasi Reset", type="secondary", use_container_width=True):
@@ -831,3 +883,4 @@ with tab5:
             save(st.session_state.D)
             st.success("Data direset.")
             st.rerun()
+
