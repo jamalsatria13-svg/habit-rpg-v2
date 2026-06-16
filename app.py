@@ -28,7 +28,7 @@ from core import (
 # ── PAGE CONFIG ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Habit RPG",
-    page_icon="⚔️",
+    page_icon="sword",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
@@ -537,8 +537,7 @@ with tab3:
 
     for m in all_missions:
         mk       = f"{week_key}_{m['id']}"
-        D.setdefault("missions", {}).setdefault(week_key, {})
-        done_now = D["missions"][week_key].get(m["id"], False)
+        done_now = D["missions"].get(mk, False)
         hp_r     = m.get("hp", 50)
         k_r      = m.get("kupon", 20)
 
@@ -548,7 +547,7 @@ with tab3:
             value=done_now, key=f"mis_{mk}"
         )
         if new_val != done_now:
-            D["missions"][week_key][m["id"]] = new_val
+            D["missions"][mk] = new_val
             if new_val:
                 D["hp"]    += hp_r
                 D["kupon"] += k_r
@@ -614,14 +613,11 @@ with tab3:
     # ── Target Bulanan ────────────────────────────────────────────────────────
     st.markdown('<div class="sec">Target Bulanan</div>', unsafe_allow_html=True)
     month_key = date.today().strftime("%Y-%m")
-    default_monthly_targets = {
+    D.setdefault("monthly_targets", {}).setdefault(month_key, {
         "kuliah":  {"label":"Hari kuliah",        "target":20, "current":0},
         "fisik":   {"label":"Hari fisik lengkap",  "target":20, "current":0},
         "faith":   {"label":"Hari sholat 5 waktu", "target":30, "current":0},
-    }
-    D.setdefault("monthly_targets", {}).setdefault(month_key, {})
-    for target_id, target_default in default_monthly_targets.items():
-        D["monthly_targets"][month_key].setdefault(target_id, target_default.copy())
+    })
     mt = D["monthly_targets"][month_key]
     faith_ids = ["subuh","dzuhur","asyar","magrib","isya"]
     mt["kuliah"]["current"] = sum(1 for ds, dh in D["habits"].items()
@@ -883,4 +879,3 @@ with tab5:
             save(st.session_state.D)
             st.success("Data direset.")
             st.rerun()
-
