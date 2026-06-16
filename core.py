@@ -13,11 +13,8 @@ from typing import Any
 DATA_FILE = Path("data.json")
 
 # ── HABIT DEFINITIONS ─────────────────────────────────────────────────────────
-# Struktur: id, name, cat, hp_reward, exp_reward, hp_penalty, exp_penalty
-# Semua reward/penalty dihitung SAAT RESET, bukan real-time
-
 DEFAULT_HABITS: list[dict] = [
-    # ── Faith (urutan pertama, tanpa penalti) ─────────────────────────────────
+    # ── Faith ─────────────────────────────────────────────────────────────────
     {"id":"subuh",    "name":"Subuh",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
     {"id":"dzuhur",   "name":"Dzuhur",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
     {"id":"asyar",    "name":"Asyar",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
@@ -43,7 +40,7 @@ DEFAULT_HABITS: list[dict] = [
     # ── Skill & Knowledge ─────────────────────────────────────────────────────
     {"id":"kuliah",  "name":"Kuliah 1 Jam",       "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
     {"id":"projek",  "name":"Projek 1 Jam",       "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
-    {"id":"video",   "name":"1 Video Ilmu",        "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
+    {"id":"video",   "name":"1 Video Ilmu",       "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
 
     # ── Finance ───────────────────────────────────────────────────────────────
     {"id":"pengeluaran_sesuai","name":"Pengeluaran Sesuai Budget","cat":"Finance","hp":0,"exp":5,"hp_pen":0,"exp_pen":1},
@@ -55,13 +52,11 @@ DEFAULT_HABITS: list[dict] = [
     {"id":"metime",    "name":"Me Time",     "cat":"Evaluasi","hp":0,"exp":5,"hp_pen":0,"exp_pen":1},
 ]
 
-# Urutan render kategori di tab harian
 HABIT_CATEGORY_ORDER = ["Faith", "Fisik", "Skill", "Finance", "Evaluasi", "Custom"]
 
 # ── WEEKLY MISSIONS ───────────────────────────────────────────────────────────
-# Misi: reward +50 HP +20 kupon jika terceklis
 DEFAULT_MISSIONS: list[dict] = [
-    {"id":"tahlil",    "name":"Tahlil",        "hp":50, "exp":0, "kupon":20, "type":"misi"},
+    {"id":"tahlil",    "name":"Tahlil",         "hp":50, "exp":0, "kupon":20, "type":"misi"},
     {"id":"puasa",     "name":"Puasa Sunah",    "hp":50, "exp":0, "kupon":20, "type":"misi"},
     {"id":"lari",      "name":"Lari 3 km",      "hp":50, "exp":0, "kupon":20, "type":"misi"},
     {"id":"gym",       "name":"Gym / Berat",    "hp":50, "exp":0, "kupon":20, "type":"misi"},
@@ -70,7 +65,6 @@ DEFAULT_MISSIONS: list[dict] = [
     {"id":"bodycare",  "name":"Bodycare",       "hp":50, "exp":0, "kupon":20, "type":"misi"},
 ]
 
-# Kewajiban: penalti -30 HP -20 kupon jika TIDAK terceklis saat reset
 DEFAULT_OBLIGATIONS: list[dict] = [
     {"id":"ob_5r",       "name":"5R Kamar",          "pen_hp":30, "pen_kupon":20},
     {"id":"ob_nyuci",    "name":"Nyuci Baju",         "pen_hp":30, "pen_kupon":20},
@@ -138,37 +132,30 @@ def default_state() -> dict[str, Any]:
         "gold": 0,
         "kupon": 0,
         "shift": "Pagi",
-        # {date_str: {habit_id: bool}} — checklist harian
         "habits": {},
-        # {week_start: {mission_id: bool}} — misi mingguan
         "missions": {},
-        # {week_start: {obligation_id: bool}} — kewajiban mingguan
         "obligations": {},
         "transactions": [],
         "redeem_log": [],
         "streak": 0,
         "best_streak": 0,
-        "faith_streak": 0,      # streak sholat 5 waktu lengkap (subuh-isya)
-        # {date_str: "done"|"partial"|"miss"} — untuk heatmap
+        "faith_streak": 0,
         "week_days": {},
-        # [{level, name, date}] — riwayat level up
         "level_history": [],
-        # {habit_id: total_count} — total keseluruhan
         "habit_history": {},
         "achievements": [],
         "total_redeems": 0,
         "total_habits_done": 0,
-        # habit/misi tambahan dari user
         "custom_habits": [],
         "custom_missions": [],
-        # {month_str: {target_id: {label, target, current}}}
         "monthly_targets": {},
         "last_date": str(date.today()),
+        "last_reset": "",
+        "last_weekly_reset": "",
     }
 
 # ── PERSISTENCE ───────────────────────────────────────────────────────────────
 def load() -> dict[str, Any]:
-    """Load dari JSON, merge dengan default untuk key baru (backward-compat)."""
     if DATA_FILE.exists():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -183,7 +170,6 @@ def load() -> dict[str, Any]:
     return default_state()
 
 def save(data: dict[str, Any]) -> None:
-    """Atomic write: tulis ke .tmp dulu, lalu rename — hindari korupsi file."""
     try:
         tmp = DATA_FILE.with_suffix(".tmp")
         with open(tmp, "w", encoding="utf-8") as f:
@@ -193,7 +179,6 @@ def save(data: dict[str, Any]) -> None:
         raise RuntimeError(f"Gagal menyimpan data: {e}")
 
 def import_data(json_str: str) -> dict[str, Any]:
-    """Parse JSON string, merge dengan default_state untuk key yang hilang."""
     imported = json.loads(json_str)
     base = default_state()
     for k, v in base.items():
@@ -203,7 +188,6 @@ def import_data(json_str: str) -> dict[str, Any]:
 
 # ── GAME LOGIC ────────────────────────────────────────────────────────────────
 def get_level(hp: int, exp: int) -> tuple[dict, dict | None, int]:
-    """Return (current_level_dict, next_level_dict|None, total_stat)."""
     total = hp + exp
     cur, nxt = LEVELS[0], None
     for i, lv in enumerate(LEVELS):
@@ -213,56 +197,54 @@ def get_level(hp: int, exp: int) -> tuple[dict, dict | None, int]:
     return cur, nxt, total
 
 def get_all_habits(data: dict) -> list[dict]:
-    """Gabungkan habit default + custom user."""
     return DEFAULT_HABITS + data.get("custom_habits", [])
 
 def get_all_missions(data: dict) -> list[dict]:
-    """Gabungkan misi default + custom user."""
     return DEFAULT_MISSIONS + data.get("custom_missions", [])
 
-def get_today_habits(data: dict) -> dict[str, bool]:
-    """Ambil status checklist untuk hari ini."""
-    return data["habits"].get(str(date.today()), {})
+def get_today_habits(data: dict, target_date: str = None) -> dict[str, bool]:
+    target = target_date or str(date.today())
+    return data["habits"].get(target, {})
 
 def set_today_habit(data: dict, habit_id: str, value: bool) -> None:
-    """Set satu habit untuk hari ini."""
     today = str(date.today())
     data["habits"].setdefault(today, {})[habit_id] = value
 
 def get_week_key() -> str:
-    """Senin minggu ini sebagai key week."""
     today = date.today()
     return str(today - __import__("datetime").timedelta(days=today.weekday()))
 
-def process_daily_reset(data: dict) -> dict[str, Any]:
-    """
-    Hitung reward dan penalti saat reset hari baru.
-    Semua perubahan stat dilakukan di sini — TIDAK real-time.
-    Returns: dict ringkasan perubahan untuk ditampilkan ke user.
-    """
-    today_key   = str(date.today())
-    today_h     = get_today_habits(data)
+def process_daily_reset(data: dict, target_date: str = None) -> dict[str, Any]:
+    target_key = target_date or str(date.today())
+    
+    # Mencegah reset dobel
+    if data.get("last_reset") == target_key:
+        return {
+            "hp_delta": 0, "exp_delta": 0, "kupon_delta": 0,
+            "streak": data.get("streak", 0), 
+            "messages": [f"Hari ini ({target_key}) sudah direset! (Data aman)"]
+        }
+
+    today_h     = get_today_habits(data, target_date=target_key)
     all_habits  = get_all_habits(data)
-    summary     = {"hp_delta": 0, "exp_delta": 0, "kupon_delta": 0,
-                   "streak": 0, "messages": []}
+    summary     = {"hp_delta": 0, "exp_delta": 0, "kupon_delta": 0, "streak": 0, "messages": []}
 
     hp_delta  = 0
     exp_delta = 0
 
-    # ── Hitung reward/penalti per habit ──────────────────────────────────────
+    # Kalkulasi reward/penalti per habit
     for h in all_habits:
         done = today_h.get(h["id"], False)
         if done:
             hp_delta  += h.get("hp",  h.get("hp_reward", 0))
             exp_delta += h.get("exp", h.get("exp_reward", 0))
-            data["habit_history"][h["id"]] = data["habit_history"].get(h["id"], 0) + 1
+            data["habit_history"][h["id"]] = data.get("habit_history", {}).get(h["id"], 0) + 1
             data["total_habits_done"] = data.get("total_habits_done", 0) + 1
         else:
-            # Kurangi penalti (gunakan key baru hp_pen/exp_pen)
             hp_delta  -= h.get("hp_pen",  0)
             exp_delta -= h.get("exp_pen", 0)
 
-    # ── Faith streak tracking (subuh s.d. isya) ───────────────────────────────
+    # Faith streak tracking
     faith_core_ids = ["subuh","dzuhur","asyar","magrib","isya"]
     faith_complete = all(today_h.get(fid, False) for fid in faith_core_ids)
     if faith_complete:
@@ -274,17 +256,16 @@ def process_daily_reset(data: dict) -> dict[str, Any]:
     else:
         data["faith_streak"] = 0
 
-    # ── Streak harian (semua habit non-Faith harus selesai untuk "done") ─────
-    # Tentukan "done" berdasarkan habit Fisik, Skill, Finance, Evaluasi
+    # Streak harian (habits non-Faith)
     non_faith = [h for h in all_habits if h["cat"] != "Faith"]
     core_done_count = sum(1 for h in non_faith if today_h.get(h["id"], False))
     all_non_faith_done = core_done_count == len(non_faith)
 
-    if all_non_faith_done:
-        data["streak"] += 1
-        if data["streak"] > data["best_streak"]:
+    if all_non_faith_done and len(non_faith) > 0:
+        data["streak"] = data.get("streak", 0) + 1
+        if data["streak"] > data.get("best_streak", 0):
             data["best_streak"] = data["streak"]
-        data["week_days"][today_key] = "done"
+        data["week_days"][target_key] = "done"
 
         # Streak rewards
         streak_rewards = {3: 30, 7: 75, 30: 300}
@@ -293,32 +274,33 @@ def process_daily_reset(data: dict) -> dict[str, Any]:
             data["kupon"] += bonus
             summary["kupon_delta"] += bonus
             summary["messages"].append(f"🔥 Streak {data['streak']} hari! +{bonus} kupon")
-    elif core_done_count >= len(non_faith) // 2:
-        data["week_days"][today_key] = "partial"
+    elif core_done_count >= max(1, len(non_faith) // 2):
+        data["week_days"][target_key] = "partial"
         data["streak"] = 0
     else:
-        data["week_days"][today_key] = "miss"
+        data["week_days"][target_key] = "miss"
         data["streak"] = 0
 
-    # ── Terapkan perubahan stat ───────────────────────────────────────────────
+    # Terapkan perubahan stat
     data["hp"]  = max(0, data["hp"] + hp_delta)
     data["exp"] = max(0, data["exp"] + exp_delta)
 
     summary["hp_delta"]  = hp_delta
     summary["exp_delta"] = exp_delta
     summary["streak"]    = data["streak"]
-
-    # ── Reset checklist hari ini ──────────────────────────────────────────────
-    data["habits"][today_key] = {}
+    
+    # Update status reset (TIDAK menghapus data["habits"] demi history chart)
+    data["last_reset"] = target_key
 
     return summary
 
 def process_weekly_reset(data: dict) -> dict[str, Any]:
-    """
-    Hitung penalti kewajiban yang tidak terceklis saat reset minggu baru.
-    Returns: ringkasan penalti.
-    """
-    week_key    = get_week_key()
+    week_key = get_week_key()
+    
+    # Mencegah reset minggu dobel
+    if data.get("last_weekly_reset") == week_key:
+        return {"hp_delta": 0, "kupon_delta": 0, "messages": ["Minggu ini sudah direset! (Data aman)"]}
+
     obligations = data.get("obligations", {}).get(week_key, {})
     summary     = {"hp_delta": 0, "kupon_delta": 0, "messages": []}
 
@@ -337,22 +319,19 @@ def process_weekly_reset(data: dict) -> dict[str, Any]:
     summary["hp_delta"]    = -hp_pen
     summary["kupon_delta"] = -kupon_pen
 
-    # Reset obligations untuk minggu ini
-    if week_key in data.get("obligations", {}):
-        data["obligations"][week_key] = {}
-
+    data["last_weekly_reset"] = week_key
+    
     return summary
 
 def check_achievements(data: dict) -> list[str]:
-    """Cek dan unlock achievement baru. Returns list ID yang baru unlock."""
     newly  = []
     has    = set(data.get("achievements", []))
     lv_now = get_level(data["hp"], data["exp"])[0]["level"]
 
     checks = {
-        "streak3":  data["streak"] >= 3,
-        "streak7":  data["streak"] >= 7,
-        "streak30": data["streak"] >= 30,
+        "streak3":  data.get("streak", 0) >= 3,
+        "streak7":  data.get("streak", 0) >= 7,
+        "streak30": data.get("streak", 0) >= 30,
         "faith7":   data.get("faith_streak", 0) >= 7,
         "level2":   lv_now >= 2,
         "level3":   lv_now >= 3,
