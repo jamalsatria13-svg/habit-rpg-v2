@@ -1,374 +1,698 @@
 """
-core.py — Data models, constants, and persistence layer.
-Single source of truth for all game data and business logic.
+app.py - Habit RPG Streamlit application.
+Run with: python -m streamlit run app.py
 """
 
 from __future__ import annotations
+
 import json
-from datetime import date
-from pathlib import Path
-from typing import Any
+import os
+import sys
+from datetime import date, timedelta
 
-# ── FILE PATH ─────────────────────────────────────────────────────────────────
-DATA_FILE = Path("data.json")
+import plotly.graph_objects as go
+import streamlit as st
 
-# ── HABIT DEFINITIONS ─────────────────────────────────────────────────────────
-# Struktur: id, name, cat, hp_reward, exp_reward, hp_penalty, exp_penalty
-# Semua reward/penalty dihitung SAAT RESET, bukan real-time
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from core import (
+    ACHIEVEMENTS,
+    COUPONS,
+    DEFAULT_OBLIGATIONS,
+    HABIT_CATEGORY_ORDER,
+    LEVELS,
+    check_achievements,
+    date_key,
+    default_state,
+    get_all_habits,
+    get_all_missions,
+    get_level,
+    get_today_habits,
+    get_unlocked_habits,
+    get_week_key,
+    import_data,
+    load,
+    now_wib,
+    run_due_resets,
+    save,
+    set_today_habit,
+    today_wib,
+    fmt_rp,
+)
 
-DEFAULT_HABITS: list[dict] = [
-    # ── Faith (urutan pertama, tanpa penalti) ─────────────────────────────────
-    {"id":"subuh",    "name":"Subuh",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
-    {"id":"dzuhur",   "name":"Dzuhur",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
-    {"id":"asyar",    "name":"Asyar",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
-    {"id":"magrib",   "name":"Magrib",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
-    {"id":"isya",     "name":"Isya",     "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
-    {"id":"duha",     "name":"Duha",     "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
-    {"id":"ngaji",    "name":"Ngaji",    "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
-    {"id":"dzikir",   "name":"Dzikir",   "cat":"Faith", "hp":3, "exp":5, "hp_pen":0, "exp_pen":0},
+st.set_page_config(
+    page_title="Habit RPG",
+    page_icon="⚔️",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
 
-    # ── Fisik Harian ──────────────────────────────────────────────────────────
-    {"id":"tidur",       "name":"Tidur 7 Jam",    "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"stretching",  "name":"Stretching",     "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"pushup_awal", "name":"Push Up Awal",   "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"pullup_awal", "name":"Pull Up Awal",   "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"skincare_awal","name":"Skincare Awal", "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"pushup_akhir","name":"Push Up Akhir",  "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"pullup_akhir","name":"Pull Up Akhir",  "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"plank",       "name":"Plank",          "cat":"Fisik", "hp":10, "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"skincare_akhir","name":"Skincare Akhir","cat":"Fisik","hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"minum",       "name":"Minum 2 Liter",  "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-    {"id":"makan",       "name":"Makan Bergizi",  "cat":"Fisik", "hp":5,  "exp":0, "hp_pen":3, "exp_pen":0},
-
-    # ── Skill & Knowledge ─────────────────────────────────────────────────────
-    {"id":"kuliah",  "name":"Kuliah 1 Jam",       "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
-    {"id":"projek",  "name":"Projek 1 Jam",       "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
-    {"id":"video",   "name":"1 Video Ilmu",        "cat":"Skill", "hp":0, "exp":10, "hp_pen":0, "exp_pen":3},
-
-    # ── Finance ───────────────────────────────────────────────────────────────
-    {"id":"pengeluaran_sesuai","name":"Pengeluaran Sesuai Budget","cat":"Finance","hp":0,"exp":5,"hp_pen":0,"exp_pen":1},
-    {"id":"catat_pengeluaran", "name":"Catat Pengeluaran",        "cat":"Finance","hp":0,"exp":5,"hp_pen":0,"exp_pen":1},
-
-    # ── Evaluasi ──────────────────────────────────────────────────────────────
-    {"id":"input_data","name":"Input Data",  "cat":"Evaluasi","hp":0,"exp":5,"hp_pen":0,"exp_pen":1},
-    {"id":"evaluasi",  "name":"Evaluasi",    "cat":"Evaluasi","hp":0,"exp":5,"hp_pen":0,"exp_pen":1},
-    {"id":"metime",    "name":"Me Time",     "cat":"Evaluasi","hp":0,"exp":5,"hp_pen":0,"exp_pen":1},
-]
-
-# Urutan render kategori di tab harian
-HABIT_CATEGORY_ORDER = ["Faith", "Fisik", "Skill", "Finance", "Evaluasi", "Custom"]
-
-# ── WEEKLY MISSIONS ───────────────────────────────────────────────────────────
-# Misi: reward +50 HP +20 kupon jika terceklis
-DEFAULT_MISSIONS: list[dict] = [
-    {"id":"tahlil",    "name":"Tahlil",        "hp":50, "exp":0, "kupon":20, "type":"misi"},
-    {"id":"puasa",     "name":"Puasa Sunah",    "hp":50, "exp":0, "kupon":20, "type":"misi"},
-    {"id":"lari",      "name":"Lari 3 km",      "hp":50, "exp":0, "kupon":20, "type":"misi"},
-    {"id":"gym",       "name":"Gym / Berat",    "hp":50, "exp":0, "kupon":20, "type":"misi"},
-    {"id":"yoga",      "name":"Yoga",           "hp":50, "exp":0, "kupon":20, "type":"misi"},
-    {"id":"detox",     "name":"Detox Tubuh",    "hp":50, "exp":0, "kupon":20, "type":"misi"},
-    {"id":"bodycare",  "name":"Bodycare",       "hp":50, "exp":0, "kupon":20, "type":"misi"},
-]
-
-# Kewajiban: penalti -30 HP -20 kupon jika TIDAK terceklis saat reset
-DEFAULT_OBLIGATIONS: list[dict] = [
-    {"id":"ob_5r",       "name":"5R Kamar",          "pen_hp":30, "pen_kupon":20},
-    {"id":"ob_nyuci",    "name":"Nyuci Baju",         "pen_hp":30, "pen_kupon":20},
-    {"id":"ob_motor",    "name":"Maintenance Motor",  "pen_hp":30, "pen_kupon":20},
-    {"id":"ob_input",    "name":"Input Mingguan",     "pen_hp":30, "pen_kupon":20},
-    {"id":"ob_efisik",   "name":"Evaluasi Fisik",     "pen_hp":30, "pen_kupon":20},
-    {"id":"ob_elajar",   "name":"Evaluasi Belajar",   "pen_hp":30, "pen_kupon":20},
-    {"id":"ob_ekeuangan","name":"Evaluasi Keuangan",  "pen_hp":30, "pen_kupon":20},
-    {"id":"ob_eprojek",  "name":"Evaluasi Projek",    "pen_hp":30, "pen_kupon":20},
-]
-
-# ── COUPONS ───────────────────────────────────────────────────────────────────
-COUPONS: list[dict] = [
-    {"id":"makan",   "name":"Makan Enak",   "pts":50,  "value":"Rp50.000"},
-    {"id":"hiburan", "name":"Hiburan/Game", "pts":100, "value":"Rp100.000"},
-    {"id":"beli",    "name":"Beli Sesuatu", "pts":200, "value":"Rp200.000"},
-    {"id":"trip",    "name":"Mini Trip",    "pts":400, "value":"Rp400.000"},
-]
-
-# ── LEVELS ────────────────────────────────────────────────────────────────────
-LEVELS: list[dict] = [
-    {"level":1, "name":"Pemula",   "threshold":0,    "avatar":"👶"},
-    {"level":2, "name":"Pejuang",  "threshold":500,  "avatar":"⚔️"},
-    {"level":3, "name":"Ksatria",  "threshold":1200, "avatar":"🛡️"},
-    {"level":4, "name":"Pahlawan", "threshold":2500, "avatar":"🦸"},
-    {"level":5, "name":"Legenda",  "threshold":5000, "avatar":"👑"},
-]
-
-# ── BUDGET ────────────────────────────────────────────────────────────────────
-BUDGET: dict[str, int] = {
-    "Kebutuhan Pokok":  350000,
-    "Kost":             600000,
-    "Kas Kantor":       100000,
-    "Cadangan & Bebas": 400000,
-    "Dana Darurat":     200000,
-    "UKT Kuliah":       300000,
+# Custom CSS styling tailored for the RPG theme
+st.markdown(
+    """
+<style>
+html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main {
+    background:#0f0f1a !important;
+    color:#e0e0f0 !important;
 }
+[data-testid="stSidebar"] { background:#13131f !important; }
+.stTabs [data-baseweb="tab-list"] {
+    background:linear-gradient(135deg,#17172a,#22223c);
+    border:1px solid #2d2d4d;
+    border-radius:14px;
+    padding:5px;
+    gap:6px;
+    box-shadow:0 10px 28px rgba(0,0,0,.22);
+}
+.stTabs [data-baseweb="tab"] {
+    min-height:42px;
+    padding:8px 14px;
+    background:transparent;
+    color:#9b9bb8 !important;
+    border-radius:10px;
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:0;
+}
+.stTabs [data-baseweb="tab"]:hover {
+    background:#252540;
+    color:#f4f0ff !important;
+}
+.stTabs [aria-selected="true"] {
+    background:linear-gradient(135deg,#7c3aed,#a78bfa) !important;
+    color:#fff !important;
+    box-shadow:0 8px 18px rgba(124,58,237,.28);
+}
+[data-testid="stMetric"] {
+    background:#1a1a2e;
+    border:1px solid #2a2a45;
+    border-radius:10px;
+    padding:12px 10px !important;
+}
+[data-testid="stMetricLabel"] { color:#888 !important; font-size:12px !important; }
+[data-testid="stMetricValue"] { color:#e0e0f0 !important; font-size:22px !important; }
+.stButton > button {
+    background:#1a1a2e;
+    color:#c4b5fd;
+    border:1px solid #3a3a5c;
+    border-radius:8px;
+    font-weight:700;
+}
+.stButton > button:hover {
+    background:#252540;
+    border-color:#a78bfa;
+    color:#fff;
+}
+.stButton > button[kind="primary"] {
+    background:linear-gradient(135deg,#7c3aed,#a78bfa);
+    color:#fff;
+    border:none;
+}
+.stTextInput input, .stNumberInput input, [data-baseweb="select"] {
+    background:#1a1a2e !important;
+    color:#e0e0f0 !important;
+    border-color:#2a2a45 !important;
+    border-radius:8px !important;
+}
+.stCheckbox label {
+    color:#d6d3ea !important;
+    font-size:15px;
+}
+hr { border-color:#2a2a45 !important; }
+.stProgress > div > div > div {
+    background:linear-gradient(90deg,#7c3aed,#a78bfa) !important;
+}
+[data-testid="stAlert"] { border-radius:10px !important; }
+.char-card {
+    background:linear-gradient(135deg,#1a1a2e 0%,#252540 100%);
+    border:1px solid #3a3a5c;
+    border-radius:14px;
+    padding:18px;
+    text-align:center;
+    margin-bottom:1rem;
+}
+.avatar-ring {
+    width:72px;
+    height:72px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#7c3aed,#a78bfa);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:0 auto 12px;
+    color:#fff;
+    font-size:20px;
+    font-weight:900;
+    box-shadow:0 0 20px rgba(167,139,250,.35);
+}
+.level-badge {
+    display:inline-block;
+    background:#272747;
+    color:#c4b5fd;
+    padding:4px 12px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:800;
+    margin-bottom:8px;
+}
+.cat-title, .sec {
+    font-size:11px;
+    font-weight:800;
+    color:#8b8bb2;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    margin:1.15rem 0 .45rem;
+}
+.coupon-card, .ach-card {
+    background:#1a1a2e;
+    border:1px solid #2a2a45;
+    border-radius:10px;
+    padding:12px;
+    margin-bottom:8px;
+}
+.coupon-card.can-redeem {
+    border-color:#7c3aed;
+    background:linear-gradient(135deg,#1a1535,#1e1a3a);
+}
+.ach-card {
+    display:flex;
+    gap:10px;
+    align-items:center;
+}
+.ach-card.unlocked {
+    border-color:#7c3aed;
+    background:#1e1535;
+}
+.tx-row {
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:7px 0;
+    border-bottom:1px solid #1e1e35;
+    font-size:13px;
+}
+</style>
+""",
+    unsafe_allow_html=True,
+)
 
-EXPENSE_CATS: list[str] = [
-    "Kebutuhan Pokok","Kost","Kas Kantor",
-    "Cadangan & Bebas","Dana Darurat","UKT Kuliah",
-    "Tabungan Utama","Lainnya"
-]
+if "D" not in st.session_state:
+    st.session_state.D = load()
+if "notifications" not in st.session_state:
+    st.session_state.notifications = []
 
-# ── ACHIEVEMENTS ──────────────────────────────────────────────────────────────
-ACHIEVEMENTS: list[dict] = [
-    {"id":"streak3",  "name":"On Fire",          "desc":"Streak 3 hari",           "icon":"🔥"},
-    {"id":"streak7",  "name":"Week Warrior",     "desc":"Streak 7 hari",           "icon":"⚡"},
-    {"id":"streak30", "name":"Iron Will",        "desc":"Streak 30 hari",          "icon":"💎"},
-    {"id":"faith7",   "name":"Istiqomah",        "desc":"Sholat 5 waktu 7 hari",   "icon":"🕌"},
-    {"id":"level2",   "name":"Pejuang Sejati",   "desc":"Mencapai Level 2",        "icon":"⚔️"},
-    {"id":"level3",   "name":"Ksatria Muda",     "desc":"Mencapai Level 3",        "icon":"🛡️"},
-    {"id":"level4",   "name":"Sang Pahlawan",    "desc":"Mencapai Level 4",        "icon":"🦸"},
-    {"id":"level5",   "name":"Sang Legenda",     "desc":"Mencapai Level 5",        "icon":"👑"},
-    {"id":"gold1000", "name":"Hemat Pangkal Kaya","desc":"Kumpulkan 1000 Gold",    "icon":"💰"},
-    {"id":"kupon5",   "name":"Reward Hunter",    "desc":"Tukar kupon 5 kali",      "icon":"🎟️"},
-    {"id":"habit100", "name":"Konsisten",        "desc":"Total 100 habit selesai", "icon":"✅"},
-]
+D = st.session_state.D
 
-# ── DEFAULT STATE ─────────────────────────────────────────────────────────────
-def default_state() -> dict[str, Any]:
-    return {
-        "hp": 50,
-        "exp": 0,
-        "gold": 0,
-        "kupon": 0,
-        "shift": "Pagi",
-        # {date_str: {habit_id: bool}} — checklist harian
-        "habits": {},
-        # {week_start: {mission_id: bool}} — misi mingguan
-        "missions": {},
-        # {week_start: {obligation_id: bool}} — kewajiban mingguan
-        "obligations": {},
-        "transactions": [],
-        "redeem_log": [],
-        "streak": 0,
-        "best_streak": 0,
-        "faith_streak": 0,      # streak sholat 5 waktu lengkap (subuh-isya)
-        # {date_str: "done"|"partial"|"miss"} — untuk heatmap
-        "week_days": {},
-        # [{level, name, date}] — riwayat level up
-        "level_history": [],
-        # {habit_id: total_count} — total keseluruhan
-        "habit_history": {},
-        "achievements": [],
-        "total_redeems": 0,
-        "total_habits_done": 0,
-        # habit/misi tambahan dari user
-        "custom_habits": [],
-        "custom_missions": [],
-        # {month_str: {target_id: {label, target, current}}}
-        "monthly_targets": {},
-        "last_date": str(date.today()),
+def persist() -> None:
+    save(st.session_state.D)
+
+def notify(message: str) -> None:
+    st.session_state.notifications.append(message)
+
+def show_notifications() -> None:
+    for message in st.session_state.notifications:
+        st.toast(message)
+    st.session_state.notifications = []
+
+def render_character(data: dict) -> None:
+    # Synchronized with core.py: Level calculation is based on cumulative HP + EXP
+    current, next_level, total = get_level(data["hp"], data["exp"])
+    
+    if next_level:
+        next_text = f"Total Stat (HP+EXP): {total} / {next_level['threshold']} &rarr; Level {next_level['level']}"
+        pct = min(1.0, (total - current["threshold"]) / (next_level["threshold"] - current["threshold"]))
+    else:
+        next_text = f"Total Stat (HP+EXP): {total} | Level Maksimal"
+        pct = 1.0
+
+    st.markdown(
+        f"""
+        <div class="char-card">
+            <div class="avatar-ring">{current['avatar']}</div>
+            <div class="level-badge">Level {current['level']} - {current['name']}</div>
+            <div style="font-size:13px;color:#9b9bb8;margin-bottom:8px;">{next_text}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.progress(pct)
+
+def build_heatmap() -> list[tuple[date, str]]:
+    color = {"done": "#7c3aed", "partial": "#4a2a7a", "miss": "#3a1a1a", "none": "#1a1a2e"}
+    result = []
+    for i in range(84):
+        day = today_wib() - timedelta(days=83 - i)
+        result.append((day, color.get(D.get("week_days", {}).get(day.isoformat(), "none"), "#1a1a2e")))
+    return result
+
+def maybe_record_level_up(previous_level: int) -> None:
+    current = get_level(D["hp"], D["exp"])[0]
+    if current["level"] > previous_level:
+        D.setdefault("level_history", []).append({
+            "level": current["level"],
+            "name": current["name"],
+            "date": date_key(),
+        })
+        notify(f"⚔️ Level up: Level {current['level']} - {current['name']}")
+
+# Check and execute due resets
+previous_level = get_level(D["hp"], D["exp"])[0]["level"]
+reset_summaries = run_due_resets(D)
+if reset_summaries:
+    maybe_record_level_up(previous_level)
+    for summary in reset_summaries:
+        if summary["type"] == "daily":
+            notify(f"🌅 Reset harian {summary['date']}: HP {summary['hp_delta']:+}, EXP {summary['exp_delta']:+}")
+        if summary["type"] == "weekly":
+            notify(f"📅 Reset mingguan {summary['week']}: HP {summary['hp_delta']:+}, Kupon {summary['kupon_delta']:+}")
+        for msg in summary.get("messages", []):
+            notify(msg)
+    for aid in check_achievements(D):
+        ach = next((a for a in ACHIEVEMENTS if a["id"] == aid), None)
+        if ach:
+            notify(f"🏆 Achievement Unlocked: {ach['name']}")
+    persist()
+
+show_notifications()
+
+tab_harian, tab_mingguan, tab_statistik, tab_review = st.tabs(["Harian", "Mingguan", "Statistik", "Review"])
+
+# ==================== TAB HARIAN ====================
+with tab_harian:
+    col_shift_1, col_shift_2 = st.columns(2)
+    with col_shift_1:
+        if st.button("Shift Pagi", type="primary" if D["shift"] == "Pagi" else "secondary", use_container_width=True):
+            D["shift"] = "Pagi"
+            persist()
+            st.rerun()
+    with col_shift_2:
+        if st.button("Shift Malam", type="primary" if D["shift"] == "Malam" else "secondary", use_container_width=True):
+            D["shift"] = "Malam"
+            persist()
+            st.rerun()
+
+    st.caption(f"{D['shift']} | {now_wib().strftime('%A, %d %B %Y %H:%M')} WIB")
+    render_character(D)
+
+    metric_hp, metric_exp, metric_kupon = st.columns(3)
+    metric_hp.metric("HP", D["hp"])
+    metric_exp.metric("EXP", D["exp"])
+    metric_kupon.metric("Kupon", D["kupon"])
+
+    st.divider()
+
+    today_habits = get_today_habits(D)
+    active_habits = get_unlocked_habits(D)
+    current_user_level = get_level(D["hp"], D["exp"])[0]["level"]
+
+    for category in HABIT_CATEGORY_ORDER:
+        items = [habit for habit in active_habits if habit["cat"] == category]
+        if not items:
+            continue
+        st.markdown(f'<div class="cat-title">{category}</div>', unsafe_allow_html=True)
+        for habit in items:
+            current_value = bool(today_habits.get(habit["id"], False))
+            
+            # Idea A: Dynamic naming indicator for leveled habits
+            lvl_info = ""
+            if "unlock_level" in habit and habit["unlock_level"] > 1:
+                lvl_info = f" *(Lv. {habit['unlock_level']})*"
+                
+            label_text = f"{habit['name']}{lvl_info}"
+            
+            new_value = st.checkbox(label_text, value=current_value, key=f"cb_{date_key()}_{habit['id']}")
+            if new_value != current_value:
+                set_today_habit(D, habit["id"], new_value)
+                persist()
+                st.rerun()
+
+    # Idea B: Robust form implementation for Habit Custom
+    with st.expander("Tambah / Hapus Habit Custom"):
+        with st.form("form_custom_habit", clear_on_submit=True):
+            hc1, hc2, hc3 = st.columns([2, 1, 1])
+            new_name = hc1.text_input("Nama Habit", placeholder="Nama habit custom")
+            new_hp = hc2.number_input("Reward HP", min_value=0, max_value=50, value=5)
+            new_exp = hc3.number_input("Reward EXP", min_value=0, max_value=50, value=5)
+            
+            hc_pen1, hc_pen2 = st.columns(2)
+            new_hp_pen = hc_pen1.number_input("Penalti HP", min_value=0, max_value=20, value=3)
+            new_exp_pen = hc_pen2.number_input("Penalti EXP", min_value=0, max_value=20, value=1)
+            
+            submit_habit = st.form_submit_button("Tambah Habit", use_container_width=True)
+            if submit_habit:
+                name = new_name.strip()
+                if name:
+                    hid = f"custom_{name.lower().replace(' ', '_')}_{len(D.get('custom_habits', []))}"
+                    D.setdefault("custom_habits", []).append({
+                        "id": hid,
+                        "name": name,
+                        "cat": "Custom",
+                        "hp": int(new_hp),
+                        "exp": int(new_exp),
+                        "hp_pen": int(new_hp_pen),
+                        "exp_pen": int(new_exp_pen),
+                        "unlock_level": 1,
+                    })
+                    persist()
+                    st.rerun()
+                    
+        st.write("---")
+        for i, habit in enumerate(D.get("custom_habits", [])):
+            row_name, row_action = st.columns([4, 1])
+            row_name.markdown(f"**{habit['name']}** <span style='color:#777; font-size:12px;'>(HP: +{habit['hp']}, EXP: +{habit['exp']})</span>", unsafe_allow_html=True)
+            if row_action.button("Hapus", key=f"delete_custom_habit_{habit['id']}"):
+                D["custom_habits"].pop(i)
+                persist()
+                st.rerun()
+
+# ==================== TAB MINGGUAN ====================
+with tab_mingguan:
+    st.markdown('<div class="sec">Heatmap Konsistensi</div>', unsafe_allow_html=True)
+    weeks: list[list[tuple[date, str]]] = []
+    current_week: list[tuple[date, str]] = []
+    for day, color in build_heatmap():
+        if day.weekday() == 0 and current_week:
+            weeks.append(current_week)
+            current_week = []
+        current_week.append((day, color))
+    if current_week:
+        weeks.append(current_week)
+
+    grid = '<div style="display:flex;gap:3px;overflow-x:auto;padding:4px 0">'
+    for week in weeks:
+        grid += '<div style="display:flex;flex-direction:column;gap:3px">'
+        for day, color in week:
+            grid += f'<div title="{day.isoformat()}" style="width:12px;height:12px;border-radius:2px;background:{color}"></div>'
+        grid += "</div>"
+    grid += "</div>"
+    st.markdown(grid, unsafe_allow_html=True)
+
+    st.divider()
+    streak_1, streak_2, streak_3 = st.columns(3)
+    streak_1.metric("Streak Harian", f"{D.get('streak', 0)} hari")
+    streak_2.metric("Streak Terbaik", f"{D.get('best_streak', 0)} hari")
+    streak_3.metric("Faith Streak", f"{D.get('faith_streak', 0)} hari")
+
+    week_key = get_week_key()
+    D.setdefault("missions", {})
+    if not isinstance(D["missions"].get(week_key), dict):
+        D["missions"][week_key] = {}
+    weekly_missions = D["missions"].setdefault(week_key, {})
+
+    st.divider()
+    # Idea C: Green/Star layout for Optional Weekly Missions
+    st.markdown('<div class="sec" style="color:#34d399;">⭐ Misi Mingguan (Bonus Rewards)</div>', unsafe_allow_html=True)
+    for mission in get_all_missions(D):
+        old_flat_key = f"{week_key}_{mission['id']}"
+        if old_flat_key in D["missions"]:
+            weekly_missions[mission["id"]] = bool(D["missions"].pop(old_flat_key))
+        done = bool(weekly_missions.get(mission["id"], False))
+        
+        # Load reward properties dynamically from the object
+        hp_reward = int(mission.get("hp", 0))
+        exp_reward = int(mission.get("exp", 0))
+        kupon_reward = int(mission.get("kupon", 0))
+        
+        reward_desc = f" (+{hp_reward} HP, +{exp_reward} EXP, +{kupon_reward} Kupon)"
+        new_done = st.checkbox(f"{mission['name']}{reward_desc}", value=done, key=f"mission_{week_key}_{mission['id']}")
+        
+        if new_done != done:
+            weekly_missions[mission["id"]] = new_done
+            if new_done:
+                D["hp"] += hp_reward
+                D["exp"] += exp_reward
+                D["kupon"] += kupon_reward
+                notify(f"🔥 Misi selesai: {mission['name']}")
+            else:
+                D["hp"] = max(0, D["hp"] - hp_reward)
+                D["exp"] = max(0, D["exp"] - exp_reward)
+                D["kupon"] = max(0, D["kupon"] - kupon_reward)
+            persist()
+            st.rerun()
+
+    # Idea B & Point 2: Custom Mission Form containing dynamic EXP
+    with st.expander("Tambah / Hapus Misi Custom"):
+        with st.form("form_custom_mission", clear_on_submit=True):
+            mc1, mc2, mc3, mc4 = st.columns([2, 1, 1, 1])
+            mission_name = mc1.text_input("Nama Misi", placeholder="Nama misi baru")
+            mission_hp = mc2.number_input("HP", min_value=0, max_value=200, value=50)
+            mission_exp = mc3.number_input("EXP", min_value=0, max_value=200, value=20)
+            mission_kupon = mc4.number_input("Kupon", min_value=0, max_value=200, value=20)
+            
+            submit_mission = st.form_submit_button("Tambah Misi", use_container_width=True)
+            if submit_mission:
+                name = mission_name.strip()
+                if name:
+                    mid = f"custom_m_{name.lower().replace(' ', '_')}_{len(D.get('custom_missions', []))}"
+                    D.setdefault("custom_missions", []).append({
+                        "id": mid, 
+                        "name": name, 
+                        "hp": int(mission_hp), 
+                        "exp": int(mission_exp), 
+                        "kupon": int(mission_kupon)
+                    })
+                    persist()
+                    st.rerun()
+                    
+        st.write("---")
+        for i, mission in enumerate(D.get("custom_missions", [])):
+            row_name, row_action = st.columns([4, 1])
+            row_name.markdown(f"**{mission['name']}** <span style='color:#777; font-size:12px;'>(HP: +{mission.get('hp',0)}, EXP: +{mission.get('exp',0)}, Kupon: +{mission.get('kupon',0)})</span>", unsafe_allow_html=True)
+            if row_action.button("Hapus", key=f"delete_custom_mission_{mission['id']}"):
+                D["custom_missions"].pop(i)
+                persist()
+                st.rerun()
+
+    st.divider()
+    # Idea C: Yellow/Warning alert for Critical Weekly Obligations
+    st.markdown('<div class="sec" style="color:#f59e0b;">⚠️ Kewajiban Mingguan (Penalti Berbahaya)</div>', unsafe_allow_html=True)
+    obligations = D.setdefault("obligations", {}).setdefault(week_key, {})
+    for obligation in DEFAULT_OBLIGATIONS:
+        done = bool(obligations.get(obligation["id"], False))
+        penalty_desc = f" *(Gagal: -{obligation['pen_hp']} HP, -{obligation['pen_kupon']} Kupon)*"
+        new_done = st.checkbox(f"{obligation['name']}{penalty_desc}", value=done, key=f"obligation_{week_key}_{obligation['id']}")
+        if new_done != done:
+            obligations[obligation["id"]] = new_done
+            persist()
+            st.rerun()
+
+    st.divider()
+    st.markdown('<div class="sec">Target Bulanan</div>', unsafe_allow_html=True)
+    month_key = today_wib().strftime("%Y-%m")
+    targets = D.setdefault("monthly_targets", {}).setdefault(month_key, {})
+    defaults = {
+        "kuliah": {"label": "Hari kuliah", "target": 20, "current": 0},
+        "fisik": {"label": "Hari fisik lengkap (Kumulatif)", "target": 20, "current": 0},
+        "faith": {"label": "Hari sholat 5 waktu", "target": 30, "current": 0},
     }
+    for key, value in defaults.items():
+        targets.setdefault(key, value.copy())
+        
+    faith_ids = ["subuh", "dzuhur", "asyar", "magrib", "isya"]
+    targets["kuliah"]["current"] = sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_key) and dh.get("kuliah", False))
+    
+    # Point 3: Aggregated calculation evaluating all active physical habits
+    total_physical_days = 0
+    all_habits_pool = get_all_habits(D)
+    physical_ids = [h["id"] for h in all_habits_pool if h.get("cat") == "Fisik Harian"]
+    
+    for ds, dh in D["habits"].items():
+        if ds.startswith(month_key) and physical_ids:
+            # Counts as a successful physical day if any active physical tracking is completed
+            if any(dh.get(pid, False) for pid in physical_ids):
+                total_physical_days += 1
+                
+    targets["fisik"]["current"] = total_physical_days
+    targets["faith"]["current"] = sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_key) and all(dh.get(fid, False) for fid in faith_ids))
+    
+    for target in targets.values():
+        pct = min(1.0, target["current"] / target["target"]) if target["target"] else 0
+        label_col, count_col = st.columns([3, 1])
+        label_col.markdown(f"**{target['label']}**")
+        count_col.markdown(f"<div style='text-align:right;color:#a78bfa'>{target['current']} / {target['target']}</div>", unsafe_allow_html=True)
+        st.progress(pct)
+    persist()
 
-# ── PERSISTENCE ───────────────────────────────────────────────────────────────
-def load() -> dict[str, Any]:
-    """Load dari JSON, merge dengan default untuk key baru (backward-compat)."""
-    if DATA_FILE.exists():
+# ==================== TAB STATISTIK ====================
+with tab_statistik:
+    st.markdown('<div class="sec">Konsistensi Harian 8 Minggu</div>', unsafe_allow_html=True)
+    labels, counts = [], []
+    for offset in range(7, -1, -1):
+        start = today_wib() - timedelta(days=today_wib().weekday() + offset * 7)
+        end = start + timedelta(days=6)
+        labels.append(start.strftime("%d/%m"))
+        counts.append(sum(1 for ds, dh in D["habits"].items() if start <= date.fromisoformat(ds) <= end and any(dh.values())))
+    fig_week = go.Figure(go.Bar(
+        x=labels,
+        y=counts,
+        marker=dict(color=counts, colorscale=[[0, "#2a1a4a"], [1, "#a78bfa"]]),
+        text=counts,
+        textposition="outside",
+        textfont=dict(color="#a78bfa"),
+    ))
+    fig_week.update_layout(
+        paper_bgcolor="#0f0f1a",
+        plot_bgcolor="#0f0f1a",
+        font=dict(color="#e0e0f0"),
+        xaxis=dict(gridcolor="#1a1a2e", color="#888"),
+        yaxis=dict(gridcolor="#1e1e35", color="#888", title="Hari aktif"),
+        margin=dict(t=30, b=20, l=20, r=20),
+        height=260,
+        showlegend=False,
+    )
+    st.plotly_chart(fig_week, use_container_width=True)
+
+    st.divider()
+    st.markdown('<div class="sec">Frekuensi Habit Bulan Ini</div>', unsafe_allow_html=True)
+    month = today_wib().strftime("%Y-%m")
+    habit_counts = {
+        habit["name"]: sum(1 for ds, dh in D["habits"].items() if ds.startswith(month) and dh.get(habit["id"], False))
+        for habit in get_all_habits(D)
+    }
+    habit_counts = {name: count for name, count in habit_counts.items() if count > 0}
+    if habit_counts:
+        sorted_counts = sorted(habit_counts.items(), key=lambda item: item[1], reverse=True)
+        fig_habits = go.Figure(go.Bar(
+            x=[count for _, count in sorted_counts],
+            y=[name for name, _ in sorted_counts],
+            orientation="h",
+            marker=dict(color=[count for _, count in sorted_counts], colorscale=[[0, "#2a1a4a"], [1, "#7c3aed"]]),
+            text=[count for _, count in sorted_counts],
+            textposition="outside",
+            textfont=dict(color="#a78bfa"),
+        ))
+        fig_habits.update_layout(
+            paper_bgcolor="#0f0f1a",
+            plot_bgcolor="#0f0f1a",
+            font=dict(color="#e0e0f0"),
+            xaxis=dict(gridcolor="#1e1e35", color="#888"),
+            yaxis=dict(color="#c0c0d8", autorange="reversed"),
+            margin=dict(t=10, b=20, l=10, r=40),
+            height=max(220, len(sorted_counts) * 30),
+        )
+        st.plotly_chart(fig_habits, use_container_width=True)
+    else:
+        st.caption("Belum ada data habit bulan ini.")
+
+# ==================== TAB REVIEW ====================
+with tab_review:
+    render_character(D)
+    rv1, rv2, rv3 = st.columns(3)
+    rv1.metric("HP", D["hp"])
+    rv2.metric("EXP", D["exp"])
+    rv3.metric("Kupon", D["kupon"])
+
+    if D.get("level_history"):
+        st.divider()
+        st.markdown('<div class="sec">Riwayat Level Up</div>', unsafe_allow_html=True)
+        for item in reversed(D["level_history"][-10:]):
+            st.markdown(f"**Level {item['level']} - {item.get('name', '')}** · `{item['date']}`")
+
+    st.divider()
+    st.markdown('<div class="sec">Achievements</div>', unsafe_allow_html=True)
+    unlocked = set(D.get("achievements", []))
+    st.caption(f"{len(unlocked)} / {len(ACHIEVEMENTS)} unlocked")
+    for achievement in ACHIEVEMENTS:
+        is_unlocked = achievement["id"] in unlocked
+        css_class = "ach-card unlocked" if is_unlocked else "ach-card"
+        opacity = "1" if is_unlocked else ".38"
+        badge = '<span style="margin-left:auto;font-size:11px;color:#a78bfa;font-weight:800">UNLOCKED</span>' if is_unlocked else ""
+        st.markdown(
+            f"""
+            <div class="{css_class}" style="opacity:{opacity}">
+                <span style="font-size:18px">{achievement['icon']}</span>
+                <div>
+                    <div style="font-weight:800;color:#c4b5fd">{achievement['name']}</div>
+                    <div style="font-size:12px;color:#777">{achievement['desc']}</div>
+                </div>
+                {badge}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+    st.markdown('<div class="sec">Ambil Reward</div>', unsafe_allow_html=True)
+    reward_col_1, reward_col_2 = st.columns(2)
+    for index, coupon in enumerate(COUPONS):
+        column = reward_col_1 if index % 2 == 0 else reward_col_2
+        with column:
+            cost = int(coupon.get("cost", coupon.get("pts", 0)))
+            can_redeem = D["kupon"] >= cost
+            
+            # Point 4: Formatted values using fmt_rp for clean localization
+            coupon_val = coupon['value']
+            if isinstance(coupon_val, (int, float)):
+                coupon_formatted_val = fmt_rp(coupon_val)
+            else:
+                coupon_formatted_val = str(coupon_val)
+
+            st.markdown(
+                f"""
+                <div class="coupon-card {'can-redeem' if can_redeem else ''}">
+                    <div style="font-weight:800;color:{'#c4b5fd' if can_redeem else '#777'}">{coupon['name']}</div>
+                    <div style="font-size:12px;color:#888">{cost} kupon</div>
+                    <div style="font-size:13px;color:#34d399;font-weight:800">{coupon_formatted_val}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            button_label = f"Ambil {coupon['name']}" if can_redeem else f"Butuh {cost - D['kupon']} kupon lagi"
+            if st.button(button_label, key=f"redeem_{coupon['id']}", disabled=not can_redeem, use_container_width=True):
+                D["kupon"] -= cost
+                D["total_redeems"] = D.get("total_redeems", 0) + 1
+                D.setdefault("redeem_log", []).insert(0, {
+                    "name": coupon["name"],
+                    "cost": cost,
+                    "value": coupon_formatted_val,
+                    "date": date_key(),
+                })
+                for aid in check_achievements(D):
+                    ach = next((a for a in ACHIEVEMENTS if a["id"] == aid), None)
+                    if ach:
+                        notify(f"🏆 Achievement Unlocked: {ach['name']}")
+                persist()
+                st.rerun()
+
+    st.divider()
+    st.markdown('<div class="sec">Riwayat Reward</div>', unsafe_allow_html=True)
+    redeem_log = D.get("redeem_log", [])
+    if redeem_log:
+        for item in redeem_log[:10]:
+            cost = item.get("cost", item.get("pts", 0))
+            # Point 4: Ensure log entries also reflect clean localized value presentation
+            st.markdown(
+                f'<div class="tx-row"><span style="color:#888">{item["date"]} · {item["name"]}</span>'
+                f'<span style="color:#f87171;font-weight:800">-{cost} kupon ({item["value"]})</span></div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.caption("Belum ada reward yang diambil.")
+
+    st.divider()
+    st.markdown('<div class="sec">Data Management</div>', unsafe_allow_html=True)
+    st.download_button(
+        "Export Backup (JSON)",
+        data=json.dumps(D, indent=2, ensure_ascii=False),
+        file_name=f"habitrpg_backup_{date_key()}.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+    uploaded = st.file_uploader("Pilih file backup .json", type=["json"], key="import_file")
+    if uploaded is not None and st.button("Konfirmasi Import Data", use_container_width=True):
         try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                saved = json.load(f)
-            base = default_state()
-            for k, v in base.items():
-                if k not in saved:
-                    saved[k] = v
-            return saved
-        except Exception:
-            pass
-    return default_state()
+            restored = import_data(uploaded.read().decode("utf-8"))
+            st.session_state.D = restored
+            save(st.session_state.D)
+            st.success("Data berhasil diimport.")
+            st.rerun()
+        except json.JSONDecodeError:
+            st.error("File JSON tidak valid.")
+        except Exception as exc:
+            st.error(f"Gagal import: {exc}")
 
-def save(data: dict[str, Any]) -> None:
-    """Atomic write: tulis ke .tmp dulu, lalu rename — hindari korupsi file."""
-    try:
-        tmp = DATA_FILE.with_suffix(".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        tmp.replace(DATA_FILE)
-    except Exception as e:
-        raise RuntimeError(f"Gagal menyimpan data: {e}")
-
-def import_data(json_str: str) -> dict[str, Any]:
-    """Parse JSON string, merge dengan default_state untuk key yang hilang."""
-    imported = json.loads(json_str)
-    base = default_state()
-    for k, v in base.items():
-        if k not in imported:
-            imported[k] = v
-    return imported
-
-# ── GAME LOGIC ────────────────────────────────────────────────────────────────
-def get_level(hp: int, exp: int) -> tuple[dict, dict | None, int]:
-    """Return (current_level_dict, next_level_dict|None, total_stat)."""
-    total = hp + exp
-    cur, nxt = LEVELS[0], None
-    for i, lv in enumerate(LEVELS):
-        if total >= lv["threshold"]:
-            cur = lv
-            nxt = LEVELS[i + 1] if i + 1 < len(LEVELS) else None
-    return cur, nxt, total
-
-def get_all_habits(data: dict) -> list[dict]:
-    """Gabungkan habit default + custom user."""
-    return DEFAULT_HABITS + data.get("custom_habits", [])
-
-def get_all_missions(data: dict) -> list[dict]:
-    """Gabungkan misi default + custom user."""
-    return DEFAULT_MISSIONS + data.get("custom_missions", [])
-
-def get_today_habits(data: dict) -> dict[str, bool]:
-    """Ambil status checklist untuk hari ini."""
-    return data["habits"].get(str(date.today()), {})
-
-def set_today_habit(data: dict, habit_id: str, value: bool) -> None:
-    """Set satu habit untuk hari ini."""
-    today = str(date.today())
-    data["habits"].setdefault(today, {})[habit_id] = value
-
-def get_week_key() -> str:
-    """Senin minggu ini sebagai key week."""
-    today = date.today()
-    return str(today - __import__("datetime").timedelta(days=today.weekday()))
-
-def process_daily_reset(data: dict) -> dict[str, Any]:
-    """
-    Hitung reward dan penalti saat reset hari baru.
-    Semua perubahan stat dilakukan di sini — TIDAK real-time.
-    Returns: dict ringkasan perubahan untuk ditampilkan ke user.
-    """
-    today_key   = str(date.today())
-    today_h     = get_today_habits(data)
-    all_habits  = get_all_habits(data)
-    summary     = {"hp_delta": 0, "exp_delta": 0, "kupon_delta": 0,
-                   "streak": 0, "messages": []}
-
-    hp_delta  = 0
-    exp_delta = 0
-
-    # ── Hitung reward/penalti per habit ──────────────────────────────────────
-    for h in all_habits:
-        done = today_h.get(h["id"], False)
-        if done:
-            hp_delta  += h.get("hp",  h.get("hp_reward", 0))
-            exp_delta += h.get("exp", h.get("exp_reward", 0))
-            data["habit_history"][h["id"]] = data["habit_history"].get(h["id"], 0) + 1
-            data["total_habits_done"] = data.get("total_habits_done", 0) + 1
-        else:
-            # Kurangi penalti (gunakan key baru hp_pen/exp_pen)
-            hp_delta  -= h.get("hp_pen",  0)
-            exp_delta -= h.get("exp_pen", 0)
-
-    # ── Faith streak tracking (subuh s.d. isya) ───────────────────────────────
-    faith_core_ids = ["subuh","dzuhur","asyar","magrib","isya"]
-    faith_complete = all(today_h.get(fid, False) for fid in faith_core_ids)
-    if faith_complete:
-        data["faith_streak"] = data.get("faith_streak", 0) + 1
-        if data["faith_streak"] == 7:
-            data["kupon"] += 50
-            summary["kupon_delta"] += 50
-            summary["messages"].append("🕌 Faith Streak 7 hari! +50 kupon")
-    else:
-        data["faith_streak"] = 0
-
-    # ── Streak harian (semua habit non-Faith harus selesai untuk "done") ─────
-    # Tentukan "done" berdasarkan habit Fisik, Skill, Finance, Evaluasi
-    non_faith = [h for h in all_habits if h["cat"] != "Faith"]
-    core_done_count = sum(1 for h in non_faith if today_h.get(h["id"], False))
-    all_non_faith_done = core_done_count == len(non_faith)
-
-    if all_non_faith_done:
-        data["streak"] += 1
-        if data["streak"] > data["best_streak"]:
-            data["best_streak"] = data["streak"]
-        data["week_days"][today_key] = "done"
-
-        # Streak rewards
-        streak_rewards = {3: 30, 7: 75, 30: 300}
-        if data["streak"] in streak_rewards:
-            bonus = streak_rewards[data["streak"]]
-            data["kupon"] += bonus
-            summary["kupon_delta"] += bonus
-            summary["messages"].append(f"🔥 Streak {data['streak']} hari! +{bonus} kupon")
-    elif core_done_count >= len(non_faith) // 2:
-        data["week_days"][today_key] = "partial"
-        data["streak"] = 0
-    else:
-        data["week_days"][today_key] = "miss"
-        data["streak"] = 0
-
-    # ── Terapkan perubahan stat ───────────────────────────────────────────────
-    data["hp"]  = max(0, data["hp"] + hp_delta)
-    data["exp"] = max(0, data["exp"] + exp_delta)
-
-    summary["hp_delta"]  = hp_delta
-    summary["exp_delta"] = exp_delta
-    summary["streak"]    = data["streak"]
-
-    # ── Reset checklist hari ini ──────────────────────────────────────────────
-    data["habits"][today_key] = {}
-
-    return summary
-
-def process_weekly_reset(data: dict) -> dict[str, Any]:
-    """
-    Hitung penalti kewajiban yang tidak terceklis saat reset minggu baru.
-    Returns: ringkasan penalti.
-    """
-    week_key    = get_week_key()
-    obligations = data.get("obligations", {}).get(week_key, {})
-    summary     = {"hp_delta": 0, "kupon_delta": 0, "messages": []}
-
-    hp_pen    = 0
-    kupon_pen = 0
-
-    for ob in DEFAULT_OBLIGATIONS:
-        if not obligations.get(ob["id"], False):
-            hp_pen    += ob["pen_hp"]
-            kupon_pen += ob["pen_kupon"]
-            summary["messages"].append(f"⚠️ {ob['name']} tidak selesai: -{ob['pen_hp']} HP -{ob['pen_kupon']} kupon")
-
-    data["hp"]    = max(0, data["hp"] - hp_pen)
-    data["kupon"] = max(0, data["kupon"] - kupon_pen)
-
-    summary["hp_delta"]    = -hp_pen
-    summary["kupon_delta"] = -kupon_pen
-
-    # Reset obligations untuk minggu ini
-    if week_key in data.get("obligations", {}):
-        data["obligations"][week_key] = {}
-
-    return summary
-
-def check_achievements(data: dict) -> list[str]:
-    """Cek dan unlock achievement baru. Returns list ID yang baru unlock."""
-    newly  = []
-    has    = set(data.get("achievements", []))
-    lv_now = get_level(data["hp"], data["exp"])[0]["level"]
-
-    checks = {
-        "streak3":  data["streak"] >= 3,
-        "streak7":  data["streak"] >= 7,
-        "streak30": data["streak"] >= 30,
-        "faith7":   data.get("faith_streak", 0) >= 7,
-        "level2":   lv_now >= 2,
-        "level3":   lv_now >= 3,
-        "level4":   lv_now >= 4,
-        "level5":   lv_now >= 5,
-        "gold1000": data["gold"] >= 1000,
-        "kupon5":   data.get("total_redeems", 0) >= 5,
-        "habit100": data.get("total_habits_done", 0) >= 100,
-    }
-
-    for aid, cond in checks.items():
-        if cond and aid not in has:
-            data["achievements"].append(aid)
-            newly.append(aid)
-
-    return newly
-
-def fmt_rp(n: int | float) -> str:
-    return "Rp{:,}".format(int(n)).replace(",", ".")
+    with st.expander("Reset Semua Data"):
+        st.warning("Semua data akan dihapus permanen.")
+        if st.button("Konfirmasi Reset", use_container_width=True):
+            st.session_state.D = default_state()
+            save(st.session_state.D)
+            st.rerun()
