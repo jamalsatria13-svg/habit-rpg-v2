@@ -4,7 +4,8 @@ core.py - data, persistence, and Habit RPG game rules.
 
 from __future__ import annotations
 
-import json
+import streamlit as st
+from supabase import create_client, Client
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -181,29 +182,33 @@ def migrate_state(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def load() -> dict[str, Any]:
-    if DATA_FILE.exists():
-        try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return migrate_state(json.load(f))
-        except Exception:
-            pass
-    return default_state()
+@st.cache_resource
+def get_supabase_client() -> Client:
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
+def load() -> dict[str, Any]:
+    try:
+        supabase = get_supabase_client()
+        # Mengambil data dari baris id=1
+        response = supabase.table("habit_data").select("json_data").eq("id", 1).execute()
+        if response.data:
+            return migrate_state(response.data[0]["json_data"])[cite: 2]
+    except Exception as e:
+        pass
+    return default_state()[cite: 2]
 
 def save(data: dict[str, Any]) -> None:
     try:
-        tmp = DATA_FILE.with_suffix(".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        tmp.replace(DATA_FILE)
+        supabase = get_supabase_client()
+        # Simpan atau update (upsert) data RPG dalam bentuk JSON ke baris id=1
+        supabase.table("habit_data").upsert({
+            "id": 1,
+            "json_data": data
+        }).execute()
     except Exception as e:
-        raise RuntimeError(f"Gagal menyimpan data: {e}")
-
-
-def import_data(json_str: str) -> dict[str, Any]:
-    imported = json.loads(json_str)
-    return migrate_state(imported)
+        raise RuntimeError(f"Gagal menyimpan data ke Supabase: {e}")
 
 
 def get_level(hp: int, exp: int) -> tuple[dict[str, Any], dict[str, Any] | None, int]:
