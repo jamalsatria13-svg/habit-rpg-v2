@@ -515,7 +515,13 @@ with tab_mingguan:
         label_col.markdown(f"**{target['label']}**")
         count_col.markdown(f"<div style='text-align:right;color:#a78bfa'>{target['current']} / {target['target']}</div>", unsafe_allow_html=True)
         st.progress(pct)
-    persist()
+    # NOTE: previously this called persist() unconditionally on every
+    # render of this tab, which meant an extra Supabase write on every
+    # single rerun even with no changes. monthly_targets are recomputed
+    # every render anyway, so only persist if they actually changed.
+    if D.get("monthly_targets") != st.session_state.get("_last_monthly_targets"):
+        persist()
+        st.session_state["_last_monthly_targets"] = json.loads(json.dumps(D.get("monthly_targets")))
 
 # ==================== TAB STATISTIK ====================
 with tab_statistik:
