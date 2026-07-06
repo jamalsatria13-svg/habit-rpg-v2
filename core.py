@@ -4,12 +4,14 @@ core.py - data, persistence, and Habit RPG game rules.
 
 from __future__ import annotations
 
-import streamlit as st
-from supabase import create_client, Client
+import json
+import os
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
+
+import streamlit as st
+from supabase import create_client, Client
 
 try:
     from zoneinfo import ZoneInfo
@@ -17,8 +19,22 @@ except Exception:  # pragma: no cover - old Python fallback
     ZoneInfo = None
 
 
-DATA_FILE = Path("data.json")
 WIB = ZoneInfo("Asia/Jakarta") if ZoneInfo else timezone(timedelta(hours=7))
+
+# --- Supabase persistence config ---
+SUPABASE_TABLE = "habit_state"
+SUPABASE_ROW_ID = 1  # single-user: always the same fixed row
+
+
+def _get_supabase_client() -> Client:
+    url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+    key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        raise RuntimeError(
+            "SUPABASE_URL / SUPABASE_KEY belum diset. "
+            "Tambahkan di .streamlit/secrets.toml atau environment variable."
+        )
+    return create_client(url, key)
 
 
 def now_wib() -> datetime:
@@ -182,33 +198,45 @@ def migrate_state(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-@st.cache_resource
-def get_supabase_client() -> Client:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
-
 def load() -> dict[str, Any]:
+    """Load state from Supabase. Falls back to a fresh default_state()
+    in-memory if Supabase is unreachable, so the app doesn't hard-crash —
+    but note that in that fallback case nothing will persist until
+    connectivity is restored."""
     try:
-        supabase = get_supabase_client()
-        # Mengambil data dari baris id=1
-        response = supabase.table("habit_data").select("json_data").eq("id", 1).execute()
-        if response.data:
-            return migrate_state(response.data[0]["json_data"])[cite: 2]
+        client = _get_supabase_client()
+        resp = (
+            client.table(SUPABASE_TABLE)
+            .select("data")
+            .eq("id", SUPABASE_ROW_ID)
+            .execute()
+        )
+        if resp.data:
+            return migrate_state(resp.data[0]["data"])
+        # No row yet: seed it.
+        state = default_state()
+        client.table(SUPABASE_TABLE).insert(
+            {"id": SUPABASE_ROW_ID, "data": state}
+        ).execute()
+        return state
     except Exception as e:
-        pass
-    return default_state()[cite: 2]
+        st.error(f"⚠️ Gagal terhubung ke Supabase, memakai data sementara: {e}")
+        return default_state()
+
 
 def save(data: dict[str, Any]) -> None:
     try:
-        supabase = get_supabase_client()
-        # Simpan atau update (upsert) data RPG dalam bentuk JSON ke baris id=1
-        supabase.table("habit_data").upsert({
-            "id": 1,
-            "json_data": data
-        }).execute()
+        client = _get_supabase_client()
+        client.table(SUPABASE_TABLE).upsert(
+            {"id": SUPABASE_ROW_ID, "data": data}
+        ).execute()
     except Exception as e:
         raise RuntimeError(f"Gagal menyimpan data ke Supabase: {e}")
+
+
+def import_data(json_str: str) -> dict[str, Any]:
+    imported = json.loads(json_str)
+    return migrate_state(imported)
 
 
 def get_level(hp: int, exp: int) -> tuple[dict[str, Any], dict[str, Any] | None, int]:
