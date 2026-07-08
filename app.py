@@ -233,12 +233,22 @@ def render_character(data: dict) -> None:
         next_text = f"👑 Total Stat (HP+EXP): {total} | Level Maksimal"
         pct = 1.0
 
+    level_quotes = {
+        1: "Kamu adalah sampah. Bahkan tanggung jawab paling dasar pun kamu tinggalkan. Lantas untuk apa kamu berharap.",
+        2: "Inilah awal dari perjalananmu. Memang berat tapi yakinlah bahwa ini jalan yang benar untuk tumbuh.",
+        3: "Sekarang kamu adalah seorang pejuang. Rasa lelahmu tak seberapa dibanding rasa malu ketika sepelekan.",
+        4: "Aku yakin sekarang tubuhmu sudah kuat, mentalmu sudah terbentuk. Namun seorang pendekar akan selalu mengasah kemampuannya untuk bersiap di medan perang.",
+        5: "Kamu sekarang adalah JAMAL. Dan jamal sekarang tidak sepele, mampu bertanggung jawab, dan seseorang yang telah mengasah pedangnya. Jangan khianati pedangmu sendiri.",
+    }
+    quote_text = level_quotes.get(current["level"], "")
+
     st.markdown(
         f"""
-        <div class="char-card">
-            <div class="avatar-ring" style="font-size: 32px;">{display_avatar}</div>
+        <div class="char-card" style="text-align:left;">
+            <div class="avatar-ring" style="font-size: 32px; margin:0 0 12px;">{display_avatar}</div>
             <div class="level-badge">🏆 Level {current['level']} - {current['name']}</div>
             <div style="font-size:13px;color:#9b9bb8;margin-bottom:8px;">{next_text}</div>
+            <div style="font-size:12px;color:#7a7a9c;font-style:italic;margin-top:6px;">"{quote_text}"</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -290,13 +300,13 @@ with tab_harian:
     col_shift_1, col_shift_2 = st.columns(2)
     with col_shift_1:
         # Added Sun emoji to Morning Shift
-        if st.button("☀️ Shift Pagi", type="primary" if D["shift"] == "Pagi" else "secondary", use_container_width=True):
+        if st.button("☀️ Shift Pagi", type="primary" if D["shift"] == "Pagi" else "secondary", width='stretch'):
             D["shift"] = "Pagi"
             persist()
             st.rerun()
     with col_shift_2:
         # Added Moon emoji to Night Shift
-        if st.button("🌙 Shift Malam", type="primary" if D["shift"] == "Malam" else "secondary", use_container_width=True):
+        if st.button("🌙 Shift Malam", type="primary" if D["shift"] == "Malam" else "secondary", width='stretch'):
             D["shift"] = "Malam"
             persist()
             st.rerun()
@@ -346,7 +356,7 @@ with tab_harian:
             new_hp_pen = hc_pen1.number_input("💔 Penalti HP", min_value=0, max_value=20, value=3)
             new_exp_pen = hc_pen2.number_input("📉 Penalti EXP", min_value=0, max_value=20, value=1)
             
-            submit_habit = st.form_submit_button("💼 Tambah Habit", use_container_width=True)
+            submit_habit = st.form_submit_button("💼 Tambah Habit", width='stretch')
             if submit_habit:
                 name = new_name.strip()
                 if name:
@@ -446,7 +456,7 @@ with tab_mingguan:
             mission_exp = mc3.number_input("✨ EXP", min_value=0, max_value=200, value=20)
             mission_kupon = mc4.number_input("🪙 Kupon", min_value=0, max_value=200, value=20)
             
-            submit_mission = st.form_submit_button("🚀 Tambah Misi", use_container_width=True)
+            submit_mission = st.form_submit_button("🚀 Tambah Misi", width='stretch')
             if submit_mission:
                 name = mission_name.strip()
                 if name:
@@ -550,7 +560,7 @@ with tab_statistik:
         height=260,
         showlegend=False,
     )
-    st.plotly_chart(fig_week, use_container_width=True)
+    st.plotly_chart(fig_week, width='stretch')
 
     st.divider()
     st.markdown('<div class="sec">🔥 Frekuensi Habit Bulan Ini</div>', unsafe_allow_html=True)
@@ -580,7 +590,7 @@ with tab_statistik:
             margin=dict(t=10, b=20, l=10, r=40),
             height=max(220, len(sorted_counts) * 30),
         )
-        st.plotly_chart(fig_habits, use_container_width=True)
+        st.plotly_chart(fig_habits, width='stretch')
     else:
         st.caption("Belum ada data habit bulan ini.")
 
@@ -648,7 +658,7 @@ with tab_review:
                 unsafe_allow_html=True,
             )
             button_label = f"🛒 Ambil {coupon['name']}" if can_redeem else f"🔒 Butuh {cost - D['kupon']} kupon"
-            if st.button(button_label, key=f"redeem_{coupon['id']}", disabled=not can_redeem, use_container_width=True):
+            if st.button(button_label, key=f"redeem_{coupon['id']}", disabled=not can_redeem, width='stretch'):
                 D["kupon"] -= cost
                 D["total_redeems"] = D.get("total_redeems", 0) + 1
                 D.setdefault("redeem_log", []).insert(0, {
@@ -686,10 +696,10 @@ with tab_review:
         data=json.dumps(D, indent=2, ensure_ascii=False),
         file_name=f"habitrpg_backup_{date_key()}.json",
         mime="application/json",
-        use_container_width=True,
+        width='stretch',
     )
     uploaded = st.file_uploader("📂 Pilih file backup .json", type=["json"], key="import_file")
-    if uploaded is not None and st.button("🔄 Konfirmasi Import Data", use_container_width=True):
+    if uploaded is not None and st.button("🔄 Konfirmasi Import Data", width='stretch'):
         try:
             restored = import_data(uploaded.read().decode("utf-8"))
             st.session_state.D = restored
@@ -703,7 +713,7 @@ with tab_review:
 
     with st.expander("🚨 Reset Semua Data"):
         st.warning("Semua data akan dihapus permanen.")
-        if st.button("💥 Konfirmasi Reset", use_container_width=True):
+        if st.button("💥 Konfirmasi Reset", width='stretch'):
             st.session_state.D = default_state()
             save(st.session_state.D)
             st.rerun()
