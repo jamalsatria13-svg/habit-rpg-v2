@@ -89,15 +89,12 @@ DEFAULT_HABITS: list[dict[str, Any]] = [
     {"id": "video", "name": "1 Video Ilmu", "cat": "Skill & Knowledge", "hp": 0, "exp": 10, "hp_pen": 0, "exp_pen": 3, "unlock_level": 1},
     {"id": "projek", "name": "Projek 1 Jam", "cat": "Skill & Knowledge", "hp": 0, "exp": 10, "hp_pen": 0, "exp_pen": 3, "unlock_level": 3},
 
-    {"id": "catat_pengeluaran", "name": "Catat Pengeluaran", "cat": "Finance", "hp": 0, "exp": 5, "hp_pen": 0, "exp_pen": 1, "unlock_level": 2},
-    {"id": "pengeluaran_sesuai", "name": "Pengeluaran Sesuai Budget", "cat": "Finance", "hp": 0, "exp": 5, "hp_pen": 0, "exp_pen": 1, "unlock_level": 3},
-
     {"id": "input_data", "name": "Input Data", "cat": "Evaluasi", "hp": 0, "exp": 5, "hp_pen": 0, "exp_pen": 1, "unlock_level": 1},
     {"id": "evaluasi", "name": "Evaluasi", "cat": "Evaluasi", "hp": 0, "exp": 5, "hp_pen": 0, "exp_pen": 1, "unlock_level": 1},
     {"id": "metime", "name": "Me Time", "cat": "Evaluasi", "hp": 0, "exp": 5, "hp_pen": 0, "exp_pen": 1, "unlock_level": 2},
 ]
 
-HABIT_CATEGORY_ORDER = ["Faith", "Fisik Harian", "Skill & Knowledge", "Finance", "Evaluasi", "Custom"]
+HABIT_CATEGORY_ORDER = ["Faith", "Fisik Harian", "Skill & Knowledge", "Evaluasi", "Custom"]
 
 DEFAULT_MISSIONS: list[dict[str, Any]] = [
     {"id": "tahlil", "name": "Tahlil", "hp": 50, "exp": 0, "kupon": 20},
@@ -147,10 +144,6 @@ ACHIEVEMENTS: list[dict[str, str]] = [
     {"id": "kupon5", "name": "Reward Hunter", "desc": "Tukar reward 5 kali", "icon": "*"},
     {"id": "habit100", "name": "Konsisten", "desc": "Total 100 habit selesai", "icon": "*"},
 ]
-
-# Kept only so old imports/backups do not break.
-BUDGET: dict[str, int] = {}
-EXPENSE_CATS: list[str] = []
 
 
 def default_state() -> dict[str, Any]:
