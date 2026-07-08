@@ -128,11 +128,11 @@ COUPONS: list[dict[str, Any]] = [
 ]
 
 LEVELS: list[dict[str, Any]] = [
-    {"level": 1, "name": "Pecundang", "threshold": 0, "avatar": "Lv1"},
-    {"level": 2, "name": "Polos", "threshold": 500, "avatar": "Lv2"},
-    {"level": 3, "name": "Pejuang", "threshold": 1200, "avatar": "Lv3"},
-    {"level": 4, "name": "Pendekar", "threshold": 2500, "avatar": "Lv4"},
-    {"level": 5, "name": "Jamal", "threshold": 5000, "avatar": "Lv5"},
+    {"level": 1, "name": "PECUNDANG", "threshold": 0, "avatar": "Lv1"},
+    {"level": 2, "name": "POLOS", "threshold": 500, "avatar": "Lv2"},
+    {"level": 3, "name": "PEJUANG", "threshold": 1200, "avatar": "Lv3"},
+    {"level": 4, "name": "PENDEKAR", "threshold": 2500, "avatar": "Lv4"},
+    {"level": 5, "name": "JAMAL", "threshold": 5000, "avatar": "Lv5"},
 ]
 
 ACHIEVEMENTS: list[dict[str, str]] = [
