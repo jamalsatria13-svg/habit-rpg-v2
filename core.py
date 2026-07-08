@@ -300,33 +300,32 @@ def process_daily_reset(data: dict[str, Any], day: date | None = None) -> dict[s
             hp_delta -= int(habit.get("hp_pen", 0))
             exp_delta -= int(habit.get("exp_pen", 0))
 
-    faith_core_ids = ["subuh", "dzuhur", "asyar", "magrib", "isya"]
-    if all(day_habits.get(fid, False) for fid in faith_core_ids):
-        data["faith_streak"] = data.get("faith_streak", 0) + 1
-        if data["faith_streak"] == 7:
-            data["kupon"] += 50
-            summary["kupon_delta"] += 50
-            summary["messages"].append("Faith streak 7 hari: +50 kupon")
-    else:
-        data["faith_streak"] = 0
+    # Streak now covers ALL unlocked habits (Faith included), not just non-Faith.
+    done_count = sum(1 for h in active_habits if day_habits.get(h["id"], False))
+    net_delta = hp_delta + exp_delta
 
-    non_faith = [h for h in active_habits if h.get("cat") != "Faith"]
-    done_count = sum(1 for h in non_faith if day_habits.get(h["id"], False))
-    if non_faith and done_count == len(non_faith):
+    if active_habits and done_count == len(active_habits):
+        # 100% misi harian selesai -> putih
         data["streak"] = data.get("streak", 0) + 1
         data["best_streak"] = max(data.get("best_streak", 0), data["streak"])
-        data["week_days"][day_key] = "done"
+        data["week_days"][day_key] = "full"
         streak_rewards = {3: 30, 7: 75, 30: 300}
         if data["streak"] in streak_rewards:
             bonus = streak_rewards[data["streak"]]
             data["kupon"] += bonus
             summary["kupon_delta"] += bonus
             summary["messages"].append(f"Streak {data['streak']} hari: +{bonus} kupon")
-    elif non_faith and done_count >= max(1, len(non_faith) // 2):
-        data["week_days"][day_key] = "partial"
+    elif done_count == 0:
+        # Semua misi harian terlewatkan -> merah
+        data["week_days"][day_key] = "miss"
+        data["streak"] = 0
+    elif net_delta > 0:
+        # Sebagian terlewat tapi stat bersih naik -> biru
+        data["week_days"][day_key] = "gain"
         data["streak"] = 0
     else:
-        data["week_days"][day_key] = "miss"
+        # Sebagian dikerjakan tapi stat bersih turun/tetap -> ungu
+        data["week_days"][day_key] = "loss"
         data["streak"] = 0
 
     data["hp"] = max(0, data.get("hp", 0) + hp_delta)
