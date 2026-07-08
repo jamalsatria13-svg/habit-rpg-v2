@@ -245,10 +245,12 @@ def render_character(data: dict) -> None:
     st.markdown(
         f"""
         <div class="char-card" style="text-align:left;">
-            <div class="avatar-ring" style="font-size: 32px; margin:0 0 12px;">{display_avatar}</div>
+            <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
+                <div class="avatar-ring" style="font-size: 32px; margin:0; flex-shrink:0;">{display_avatar}</div>
+                <div style="font-size:16px;color:#c4b5fd;font-style:italic;line-height:1.4;">"{quote_text}"</div>
+            </div>
             <div class="level-badge">🏆 Level {current['level']} - {current['name']}</div>
             <div style="font-size:13px;color:#9b9bb8;margin-bottom:8px;">{next_text}</div>
-            <div style="font-size:12px;color:#7a7a9c;font-style:italic;margin-top:6px;">"{quote_text}"</div>
         </div>
         """,
         unsafe_allow_html=True,
