@@ -284,9 +284,12 @@ def build_heatmap() -> list[tuple[date, str]]:
         "miss": "#ef4444",   # merah: semua misi harian terlewat
         "none": "#1a1a2e",   # belum ada data hari itu
     }
+    today = today_wib()
+    monday_this_week = today - timedelta(days=today.weekday())  # Senin minggu ini
+    start_date = monday_this_week - timedelta(weeks=11)  # mundur 12 minggu kalender penuh
     result = []
     for i in range(84):
-        day = today_wib() - timedelta(days=83 - i)
+        day = start_date + timedelta(days=i)
         result.append((day, color.get(D.get("week_days", {}).get(day.isoformat(), "none"), "#1a1a2e")))
     return result
 
