@@ -91,12 +91,16 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main {
 [data-testid="stMetricLabel"] { color:#888 !important; font-size:10px !important; }
 [data-testid="stMetricValue"] { color:#e0e0f0 !important; font-size:16px !important; }
 .st-key-stat_row_harian [data-testid="stHorizontalBlock"],
-.st-key-stat_row_review [data-testid="stHorizontalBlock"] {
+.st-key-stat_row_review [data-testid="stHorizontalBlock"],
+.st-key-shift_row [data-testid="stHorizontalBlock"],
+.st-key-streak_row [data-testid="stHorizontalBlock"] {
     flex-wrap:nowrap !important;
     gap:6px !important;
 }
 .st-key-stat_row_harian [data-testid="stColumn"],
-.st-key-stat_row_review [data-testid="stColumn"] {
+.st-key-stat_row_review [data-testid="stColumn"],
+.st-key-shift_row [data-testid="stColumn"],
+.st-key-streak_row [data-testid="stColumn"] {
     min-width:0 !important;
     width:auto !important;
     flex:1 1 0 !important;
@@ -273,7 +277,13 @@ def render_character(data: dict) -> None:
     )
 
 def build_heatmap() -> list[tuple[date, str]]:
-    color = {"done": "#7c3aed", "partial": "#4a2a7a", "miss": "#3a1a1a", "none": "#1a1a2e"}
+    color = {
+        "full": "#f5f5fa",   # putih: 100% misi harian selesai
+        "gain": "#3b82f6",   # biru: ada yang terlewat, tapi stat bersih naik
+        "loss": "#7c3aed",   # ungu: ada yang dikerjakan, tapi stat bersih turun
+        "miss": "#ef4444",   # merah: semua misi harian terlewat
+        "none": "#1a1a2e",   # belum ada data hari itu
+    }
     result = []
     for i in range(84):
         day = today_wib() - timedelta(days=83 - i)
@@ -314,19 +324,20 @@ tab_harian, tab_mingguan, tab_statistik, tab_review = st.tabs(["📅 Harian", "�
 
 # ==================== TAB HARIAN ====================
 with tab_harian:
-    col_shift_1, col_shift_2 = st.columns(2)
-    with col_shift_1:
-        # Added Sun emoji to Morning Shift
-        if st.button("☀️ Shift Pagi", type="primary" if D["shift"] == "Pagi" else "secondary", width='stretch'):
-            D["shift"] = "Pagi"
-            persist()
-            st.rerun()
-    with col_shift_2:
-        # Added Moon emoji to Night Shift
-        if st.button("🌙 Shift Malam", type="primary" if D["shift"] == "Malam" else "secondary", width='stretch'):
-            D["shift"] = "Malam"
-            persist()
-            st.rerun()
+    with st.container(key="shift_row"):
+        col_shift_1, col_shift_2 = st.columns(2)
+        with col_shift_1:
+            # Added Sun emoji to Morning Shift
+            if st.button("☀️ Shift Pagi", type="primary" if D["shift"] == "Pagi" else "secondary", width='stretch'):
+                D["shift"] = "Pagi"
+                persist()
+                st.rerun()
+        with col_shift_2:
+            # Added Moon emoji to Night Shift
+            if st.button("🌙 Shift Malam", type="primary" if D["shift"] == "Malam" else "secondary", width='stretch'):
+                D["shift"] = "Malam"
+                persist()
+                st.rerun()
 
     st.caption(f"⚙️ {D['shift']} | 🕒 {now_wib().strftime('%A, %d %B %Y %H:%M')} WIB")
     render_character(D)
@@ -363,62 +374,19 @@ with tab_harian:
                 persist()
                 st.rerun()
 
-    with st.expander("➕ Tambah / Hapus Habit Custom"):
-        with st.form("form_custom_habit", clear_on_submit=True):
-            hc1, hc2, hc3 = st.columns([2, 1, 1])
-            new_name = hc1.text_input("Nama Habit", placeholder="Nama habit custom")
-            new_hp = hc2.number_input("❤️ Reward HP", min_value=0, max_value=50, value=5)
-            new_exp = hc3.number_input("✨ Reward EXP", min_value=0, max_value=50, value=5)
-            
-            hc_pen1, hc_pen2 = st.columns(2)
-            new_hp_pen = hc_pen1.number_input("💔 Penalti HP", min_value=0, max_value=20, value=3)
-            new_exp_pen = hc_pen2.number_input("📉 Penalti EXP", min_value=0, max_value=20, value=1)
-            
-            submit_habit = st.form_submit_button("💼 Tambah Habit", width='stretch')
-            if submit_habit:
-                name = new_name.strip()
-                if name:
-                    hid = f"custom_{name.lower().replace(' ', '_')}_{len(D.get('custom_habits', []))}"
-                    D.setdefault("custom_habits", []).append({
-                        "id": hid,
-                        "name": name,
-                        "cat": "Custom",
-                        "hp": int(new_hp),
-                        "exp": int(new_exp),
-                        "hp_pen": int(new_hp_pen),
-                        "exp_pen": int(new_exp_pen),
-                        "unlock_level": 1,
-                    })
-                    persist()
-                    st.rerun()
-                    
-        st.write("---")
-        for i, habit in enumerate(D.get("custom_habits", [])):
-            row_name, row_action = st.columns([4, 1])
-            row_name.markdown(f"**{habit['name']}** <span style='color:#777; font-size:12px;'>(❤️ +{habit['hp']}, ✨ +{habit['exp']})</span>", unsafe_allow_html=True)
-            if row_action.button("🗑️ Hapus", key=f"delete_custom_habit_{habit['id']}"):
-                D["custom_habits"].pop(i)
-                persist()
-                st.rerun()
-
 # ==================== TAB MINGGUAN ====================
 with tab_mingguan:
     st.markdown('<div class="sec">🟩 Heatmap Konsistensi</div>', unsafe_allow_html=True)
-    weeks: list[list[tuple[date, str]]] = []
-    current_week: list[tuple[date, str]] = []
-    for day, color in build_heatmap():
-        if day.weekday() == 0 and current_week:
-            weeks.append(current_week)
-            current_week = []
-        current_week.append((day, color))
-    if current_week:
-        weeks.append(current_week)
+    heatmap_days = build_heatmap()  # 84 hari = 12 kolom x 7 baris
+    columns_12x7: list[list[tuple[date, str]]] = [
+        heatmap_days[i:i + 7] for i in range(0, len(heatmap_days), 7)
+    ]
 
-    # --- EXPANDED HEATMAP GRID (Enlarged size from 12px to 18px and gap to 5px) ---
+    # --- HEATMAP GRID 12x7 ---
     grid = '<div style="display:flex;gap:5px;overflow-x:auto;padding:6px 0">'
-    for week in weeks:
+    for col in columns_12x7:
         grid += '<div style="display:flex;flex-direction:column;gap:5px">'
-        for day, color in week:
+        for day, color in col:
             grid += f'<div title="{day.isoformat()}" style="width:18px;height:18px;border-radius:3px;background:{color}"></div>'
         grid += "</div>"
     grid += "</div>"
@@ -426,10 +394,10 @@ with tab_mingguan:
 
     st.divider()
     # Added Streaks Emojis
-    streak_1, streak_2, streak_3 = st.columns(3)
-    streak_1.metric("🔥 Streak Harian", f"{D.get('streak', 0)} hari")
-    streak_2.metric("👑 Streak Terbaik", f"{D.get('best_streak', 0)} hari")
-    streak_3.metric("🙏 Faith Streak", f"{D.get('faith_streak', 0)} hari")
+    with st.container(key="streak_row"):
+        streak_1, streak_2 = st.columns(2)
+        streak_1.metric("🔥 Streak Harian", f"{D.get('streak', 0)} hari")
+        streak_2.metric("👑 Streak Terbaik", f"{D.get('best_streak', 0)} hari")
 
     week_key = get_week_key()
     D.setdefault("missions", {})
