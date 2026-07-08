@@ -85,11 +85,22 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main {
 [data-testid="stMetric"] {
     background:#1a1a2e;
     border:1px solid #2a2a45;
-    border-radius:10px;
-    padding:12px 10px !important;
+    border-radius:8px;
+    padding:8px 6px !important;
 }
-[data-testid="stMetricLabel"] { color:#888 !important; font-size:12px !important; }
-[data-testid="stMetricValue"] { color:#e0e0f0 !important; font-size:22px !important; }
+[data-testid="stMetricLabel"] { color:#888 !important; font-size:10px !important; }
+[data-testid="stMetricValue"] { color:#e0e0f0 !important; font-size:16px !important; }
+.st-key-stat_row_harian [data-testid="stHorizontalBlock"],
+.st-key-stat_row_review [data-testid="stHorizontalBlock"] {
+    flex-wrap:nowrap !important;
+    gap:6px !important;
+}
+.st-key-stat_row_harian [data-testid="stColumn"],
+.st-key-stat_row_review [data-testid="stColumn"] {
+    min-width:0 !important;
+    width:auto !important;
+    flex:1 1 0 !important;
+}
 .stButton > button {
     background:#1a1a2e;
     color:#c4b5fd;
@@ -256,6 +267,10 @@ def render_character(data: dict) -> None:
         unsafe_allow_html=True,
     )
     st.progress(pct)
+    st.markdown(
+        f"<div style='text-align:right;font-size:11px;color:#8b8bb2;margin-top:-6px;'>{pct * 100:.0f}%</div>",
+        unsafe_allow_html=True,
+    )
 
 def build_heatmap() -> list[tuple[date, str]]:
     color = {"done": "#7c3aed", "partial": "#4a2a7a", "miss": "#3a1a1a", "none": "#1a1a2e"}
@@ -317,10 +332,11 @@ with tab_harian:
     render_character(D)
 
     # Added Core Metas Emojis (HP, EXP, Kupon)
-    metric_hp, metric_exp, metric_kupon = st.columns(3)
-    metric_hp.metric("❤️ HP", D["hp"])
-    metric_exp.metric("✨ EXP", D["exp"])
-    metric_kupon.metric("🪙 Kupon", D["kupon"])
+    with st.container(key="stat_row_harian"):
+        metric_hp, metric_exp, metric_kupon = st.columns(3)
+        metric_hp.metric("❤️ HP", D["hp"])
+        metric_exp.metric("✨ EXP", D["exp"])
+        metric_kupon.metric("🪙 Kupon", D["kupon"])
 
     st.divider()
 
@@ -599,10 +615,11 @@ with tab_statistik:
 # ==================== TAB REVIEW ====================
 with tab_review:
     render_character(D)
-    rv1, rv2, rv3 = st.columns(3)
-    rv1.metric("❤️ HP", D["hp"])
-    rv2.metric("✨ EXP", D["exp"])
-    rv3.metric("🪙 Kupon", D["kupon"])
+    with st.container(key="stat_row_review"):
+        rv1, rv2, rv3 = st.columns(3)
+        rv1.metric("❤️ HP", D["hp"])
+        rv2.metric("✨ EXP", D["exp"])
+        rv3.metric("🪙 Kupon", D["kupon"])
 
     if D.get("level_history"):
         st.divider()
