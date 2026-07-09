@@ -29,7 +29,6 @@ from core import (
     get_today_habits,
     get_unlocked_habits,
     get_week_key,
-    import_data,
     load,
     now_wib,
     run_due_resets,
@@ -323,7 +322,7 @@ if reset_summaries:
 
 show_notifications()
 
-tab_harian, tab_mingguan, tab_statistik, tab_review = st.tabs(["📅 Harian", "⚔️ Mingguan", "📊 Statistik", "🏆 Review"])
+tab_harian, tab_mingguan, tab_progres, tab_profil = st.tabs(["📅 Harian", "⚔️ Mingguan", "📊 Progres", "🏆 Profil"])
 
 # ==================== TAB HARIAN ====================
 with tab_harian:
@@ -343,15 +342,6 @@ with tab_harian:
                 st.rerun()
 
     st.caption(f"⚙️ {D['shift']} | 🕒 {now_wib().strftime('%A, %d %B %Y %H:%M')} WIB")
-    render_character(D)
-
-    # Added Core Metas Emojis (HP, EXP, Kupon)
-    with st.container(key="stat_row_harian"):
-        metric_hp, metric_exp, metric_kupon = st.columns(3)
-        metric_hp.metric("❤️ HP", D["hp"])
-        metric_exp.metric("✨ EXP", D["exp"])
-        metric_kupon.metric("🪙 Kupon", D["kupon"])
-
     st.divider()
 
     today_habits = get_today_habits(D)
@@ -379,29 +369,6 @@ with tab_harian:
 
 # ==================== TAB MINGGUAN ====================
 with tab_mingguan:
-    st.markdown('<div class="sec">🟩 Heatmap Konsistensi</div>', unsafe_allow_html=True)
-    heatmap_days = build_heatmap()  # 84 hari = 12 kolom x 7 baris
-    columns_12x7: list[list[tuple[date, str]]] = [
-        heatmap_days[i:i + 7] for i in range(0, len(heatmap_days), 7)
-    ]
-
-    # --- HEATMAP GRID 12x7 ---
-    grid = '<div style="display:flex;gap:5px;overflow-x:auto;padding:6px 0">'
-    for col in columns_12x7:
-        grid += '<div style="display:flex;flex-direction:column;gap:5px">'
-        for day, color in col:
-            grid += f'<div title="{day.isoformat()}" style="width:18px;height:18px;border-radius:3px;background:{color}"></div>'
-        grid += "</div>"
-    grid += "</div>"
-    st.markdown(grid, unsafe_allow_html=True)
-
-    st.divider()
-    # Added Streaks Emojis
-    with st.container(key="streak_row"):
-        streak_1, streak_2 = st.columns(2)
-        streak_1.metric("🔥 Streak Harian", f"{D.get('streak', 0)} hari")
-        streak_2.metric("👑 Streak Terbaik", f"{D.get('best_streak', 0)} hari")
-
     week_key = get_week_key()
     D.setdefault("missions", {})
     if not isinstance(D["missions"].get(week_key), dict):
@@ -481,49 +448,69 @@ with tab_mingguan:
             persist()
             st.rerun()
 
-    st.divider()
-    st.markdown('<div class="sec">📈 Target Bulanan</div>', unsafe_allow_html=True)
-    month_key = today_wib().strftime("%Y-%m")
-    targets = D.setdefault("monthly_targets", {}).setdefault(month_key, {})
-    defaults = {
-        "kuliah": {"label": "Hari kuliah", "target": 20, "current": 0},
-        "fisik": {"label": "Hari fisik lengkap (Kumulatif)", "target": 20, "current": 0},
-        "faith": {"label": "Hari sholat 5 waktu", "target": 30, "current": 0},
-    }
-    for key, value in defaults.items():
-        targets.setdefault(key, value.copy())
-        
-    faith_ids = ["subuh", "dzuhur", "asyar", "magrib", "isya"]
-    targets["kuliah"]["current"] = sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_key) and dh.get("kuliah", False))
-    
-    total_physical_days = 0
-    all_habits_pool = get_all_habits(D)
-    physical_ids = [h["id"] for h in all_habits_pool if h.get("cat") == "Fisik Harian"]
-    
-    for ds, dh in D["habits"].items():
-        if ds.startswith(month_key) and physical_ids:
-            if any(dh.get(pid, False) for pid in physical_ids):
-                total_physical_days += 1
-                
-    targets["fisik"]["current"] = total_physical_days
-    targets["faith"]["current"] = sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_key) and all(dh.get(fid, False) for fid in faith_ids))
-    
-    for target in targets.values():
-        pct = min(1.0, target["current"] / target["target"]) if target["target"] else 0
-        label_col, count_col = st.columns([3, 1])
-        label_col.markdown(f"**{target['label']}**")
-        count_col.markdown(f"<div style='text-align:right;color:#a78bfa'>{target['current']} / {target['target']}</div>", unsafe_allow_html=True)
-        st.progress(pct)
-    # NOTE: previously this called persist() unconditionally on every
-    # render of this tab, which meant an extra Supabase write on every
-    # single rerun even with no changes. monthly_targets are recomputed
-    # every render anyway, so only persist if they actually changed.
-    if D.get("monthly_targets") != st.session_state.get("_last_monthly_targets"):
-        persist()
-        st.session_state["_last_monthly_targets"] = json.loads(json.dumps(D.get("monthly_targets")))
+# ==================== TAB PROGRES ====================
+with tab_progres:
+    st.markdown('<div class="sec">🔥 Streak</div>', unsafe_allow_html=True)
+    with st.container(key="streak_row"):
+        streak_1, streak_2 = st.columns(2)
+        streak_1.metric("🔥 Streak Harian", f"{D.get('streak', 0)} hari")
+        streak_2.metric("👑 Streak Terbaik", f"{D.get('best_streak', 0)} hari")
 
-# ==================== TAB STATISTIK ====================
-with tab_statistik:
+    st.divider()
+    st.markdown('<div class="sec">🟩 Heatmap Konsistensi</div>', unsafe_allow_html=True)
+    heatmap_days = build_heatmap()  # 84 hari = 12 kolom x 7 baris
+    columns_12x7: list[list[tuple[date, str]]] = [
+        heatmap_days[i:i + 7] for i in range(0, len(heatmap_days), 7)
+    ]
+
+    # --- HEATMAP GRID 12x7 ---
+    grid = '<div style="display:flex;gap:5px;overflow-x:auto;padding:6px 0">'
+    for col in columns_12x7:
+        grid += '<div style="display:flex;flex-direction:column;gap:5px">'
+        for day, color in col:
+            grid += f'<div title="{day.isoformat()}" style="width:18px;height:18px;border-radius:3px;background:{color}"></div>'
+        grid += "</div>"
+    grid += "</div>"
+    st.markdown(grid, unsafe_allow_html=True)
+
+    st.divider()
+    st.markdown('<div class="sec">📈 Perolehan Stat per Hari</div>', unsafe_allow_html=True)
+    habit_reward_map = {h["id"]: (int(h.get("hp", 0)), int(h.get("exp", 0))) for h in get_all_habits(D)}
+    recorded_days = sorted(D["habits"].keys())[-30:]
+    gain_labels, gain_values = [], []
+    for ds in recorded_days:
+        dh = D["habits"][ds]
+        gained = sum(
+            habit_reward_map.get(hid, (0, 0))[0] + habit_reward_map.get(hid, (0, 0))[1]
+            for hid, done in dh.items() if done
+        )
+        gain_labels.append(date.fromisoformat(ds).strftime("%d/%m"))
+        gain_values.append(gained)
+    if gain_values:
+        fig_gain = go.Figure(go.Scatter(
+            x=gain_labels,
+            y=gain_values,
+            mode="lines+markers",
+            line=dict(color="#a78bfa", width=2),
+            marker=dict(color="#7c3aed", size=6),
+            fill="tozeroy",
+            fillcolor="rgba(124,58,237,0.15)",
+        ))
+        fig_gain.update_layout(
+            paper_bgcolor="#0f0f1a",
+            plot_bgcolor="#0f0f1a",
+            font=dict(color="#e0e0f0"),
+            xaxis=dict(gridcolor="#1a1a2e", color="#888"),
+            yaxis=dict(gridcolor="#1e1e35", color="#888", title="HP+EXP diperoleh"),
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=260,
+            showlegend=False,
+        )
+        st.plotly_chart(fig_gain, width='stretch')
+    else:
+        st.caption("Belum ada data harian untuk ditampilkan.")
+
+    st.divider()
     st.markdown('<div class="sec">📊 Konsistensi Harian 8 Minggu</div>', unsafe_allow_html=True)
     labels, counts = [], []
     for offset in range(7, -1, -1):
@@ -583,8 +570,49 @@ with tab_statistik:
     else:
         st.caption("Belum ada data habit bulan ini.")
 
-# ==================== TAB REVIEW ====================
-with tab_review:
+    st.divider()
+    st.markdown('<div class="sec">📈 Target Bulanan</div>', unsafe_allow_html=True)
+    month_key = today_wib().strftime("%Y-%m")
+    targets = D.setdefault("monthly_targets", {}).setdefault(month_key, {})
+    defaults = {
+        "kuliah": {"label": "Hari kuliah", "target": 20, "current": 0},
+        "fisik": {"label": "Hari fisik lengkap (Kumulatif)", "target": 20, "current": 0},
+        "faith": {"label": "Hari sholat 5 waktu", "target": 30, "current": 0},
+    }
+    for key, value in defaults.items():
+        targets.setdefault(key, value.copy())
+
+    faith_ids = ["subuh", "dzuhur", "asyar", "magrib", "isya"]
+    targets["kuliah"]["current"] = sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_key) and dh.get("kuliah", False))
+
+    total_physical_days = 0
+    all_habits_pool = get_all_habits(D)
+    physical_ids = [h["id"] for h in all_habits_pool if h.get("cat") == "Fisik Harian"]
+
+    for ds, dh in D["habits"].items():
+        if ds.startswith(month_key) and physical_ids:
+            if any(dh.get(pid, False) for pid in physical_ids):
+                total_physical_days += 1
+
+    targets["fisik"]["current"] = total_physical_days
+    targets["faith"]["current"] = sum(1 for ds, dh in D["habits"].items() if ds.startswith(month_key) and all(dh.get(fid, False) for fid in faith_ids))
+
+    for target in targets.values():
+        pct = min(1.0, target["current"] / target["target"]) if target["target"] else 0
+        label_col, count_col = st.columns([3, 1])
+        label_col.markdown(f"**{target['label']}**")
+        count_col.markdown(f"<div style='text-align:right;color:#a78bfa'>{target['current']} / {target['target']}</div>", unsafe_allow_html=True)
+        st.progress(pct)
+    # NOTE: previously this called persist() unconditionally on every
+    # render of this tab, which meant an extra Supabase write on every
+    # single rerun even with no changes. monthly_targets are recomputed
+    # every render anyway, so only persist if they actually changed.
+    if D.get("monthly_targets") != st.session_state.get("_last_monthly_targets"):
+        persist()
+        st.session_state["_last_monthly_targets"] = json.loads(json.dumps(D.get("monthly_targets")))
+
+# ==================== TAB PROFIL ====================
+with tab_profil:
     render_character(D)
     with st.container(key="stat_row_review"):
         rv1, rv2, rv3 = st.columns(3)
@@ -680,27 +708,6 @@ with tab_review:
         st.caption("Belum ada reward yang diambil.")
 
     st.divider()
-    st.markdown('<div class="sec">💾 Data Management</div>', unsafe_allow_html=True)
-    st.download_button(
-        "📥 Export Backup (JSON)",
-        data=json.dumps(D, indent=2, ensure_ascii=False),
-        file_name=f"habitrpg_backup_{date_key()}.json",
-        mime="application/json",
-        width='stretch',
-    )
-    uploaded = st.file_uploader("📂 Pilih file backup .json", type=["json"], key="import_file")
-    if uploaded is not None and st.button("🔄 Konfirmasi Import Data", width='stretch'):
-        try:
-            restored = import_data(uploaded.read().decode("utf-8"))
-            st.session_state.D = restored
-            save(st.session_state.D)
-            st.success("Data berhasil diimport.")
-            st.rerun()
-        except json.JSONDecodeError:
-            st.error("File JSON tidak valid.")
-        except Exception as exc:
-            st.error(f"Gagal import: {exc}")
-
     with st.expander("🚨 Reset Semua Data"):
         st.warning("Semua data akan dihapus permanen.")
         if st.button("💥 Konfirmasi Reset", width='stretch'):
