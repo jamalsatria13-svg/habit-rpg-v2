@@ -161,6 +161,7 @@ def default_state() -> dict[str, Any]:
         "best_streak": 0,
         "faith_streak": 0,
         "week_days": {},
+        "daily_stats": {},
         "level_history": [],
         "habit_history": {},
         "achievements": [],
@@ -288,17 +289,23 @@ def process_daily_reset(data: dict[str, Any], day: date | None = None) -> dict[s
     summary = {"date": day_key, "hp_delta": 0, "exp_delta": 0, "kupon_delta": 0, "streak": 0, "messages": []}
     hp_delta = 0
     exp_delta = 0
+    gain_total = 0
+    penalty_total = 0
 
     for habit in active_habits:
         done = bool(day_habits.get(habit["id"], False))
         if done:
             hp_delta += int(habit.get("hp", 0))
             exp_delta += int(habit.get("exp", 0))
+            gain_total += int(habit.get("hp", 0)) + int(habit.get("exp", 0))
             data["habit_history"][habit["id"]] = data["habit_history"].get(habit["id"], 0) + 1
             data["total_habits_done"] = data.get("total_habits_done", 0) + 1
         else:
             hp_delta -= int(habit.get("hp_pen", 0))
             exp_delta -= int(habit.get("exp_pen", 0))
+            penalty_total += int(habit.get("hp_pen", 0)) + int(habit.get("exp_pen", 0))
+
+    data.setdefault("daily_stats", {})[day_key] = {"gain": gain_total, "penalty": penalty_total}
 
     # Streak now covers ALL unlocked habits (Faith included), not just non-Faith.
     done_count = sum(1 for h in active_habits if day_habits.get(h["id"], False))
