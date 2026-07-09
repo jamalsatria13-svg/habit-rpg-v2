@@ -475,20 +475,40 @@ with tab_progres:
 
     st.divider()
     st.markdown('<div class="sec">📈 Perolehan Stat per Hari</div>', unsafe_allow_html=True)
-    habit_reward_map = {h["id"]: (int(h.get("hp", 0)), int(h.get("exp", 0))) for h in get_all_habits(D)}
-    recorded_days = sorted(D["habits"].keys())[-30:]
-    gain_labels, gain_values = [], []
-    for ds in recorded_days:
-        dh = D["habits"][ds]
-        gained = sum(
-            habit_reward_map.get(hid, (0, 0))[0] + habit_reward_map.get(hid, (0, 0))[1]
-            for hid, done in dh.items() if done
+    daily_stats = D.get("daily_stats", {})
+    today_key = date_key()
+    today_is_live = today_key not in daily_stats  # hari ini belum "ditutup" oleh reset harian
+
+    live_gain, live_penalty = 0, 0
+    if today_is_live:
+        today_habits_now = D["habits"].get(today_key, {})
+        unlocked_now = get_unlocked_habits(D)
+        live_gain = sum(
+            int(h.get("hp", 0)) + int(h.get("exp", 0))
+            for h in unlocked_now if today_habits_now.get(h["id"], False)
         )
-        gain_labels.append(date.fromisoformat(ds).strftime("%d/%m"))
-        gain_values.append(gained)
+        live_penalty = sum(
+            int(h.get("hp_pen", 0)) + int(h.get("exp_pen", 0))
+            for h in unlocked_now if not today_habits_now.get(h["id"], False)
+        )
+
+    display_days = sorted(set(daily_stats.keys()) | ({today_key} if today_is_live else set()))[-30:]
+
+    chart_labels, gain_values, penalty_values = [], [], []
+    for ds in display_days:
+        is_today_live_point = today_is_live and ds == today_key
+        entry = daily_stats.get(ds, {})
+        gain_values.append(live_gain if is_today_live_point else int(entry.get("gain", 0)))
+        penalty_values.append(live_penalty if is_today_live_point else int(entry.get("penalty", 0)))
+        label = date.fromisoformat(ds).strftime("%d/%m")
+        chart_labels.append(f"{label}*" if is_today_live_point else label)
+
+    if today_is_live:
+        st.caption("* Hari ini masih berjalan — angka final baru terkunci setelah reset harian berikutnya.")
+
     if gain_values:
         fig_gain = go.Figure(go.Scatter(
-            x=gain_labels,
+            x=chart_labels,
             y=gain_values,
             mode="lines+markers",
             line=dict(color="#a78bfa", width=2),
@@ -507,6 +527,32 @@ with tab_progres:
             showlegend=False,
         )
         st.plotly_chart(fig_gain, width='stretch')
+    else:
+        st.caption("Belum ada data harian untuk ditampilkan.")
+
+    st.divider()
+    st.markdown('<div class="sec">📉 Penalti Stat per Hari</div>', unsafe_allow_html=True)
+    if penalty_values:
+        fig_penalty = go.Figure(go.Scatter(
+            x=chart_labels,
+            y=penalty_values,
+            mode="lines+markers",
+            line=dict(color="#ef4444", width=2),
+            marker=dict(color="#ef4444", size=6),
+            fill="tozeroy",
+            fillcolor="rgba(239,68,68,0.15)",
+        ))
+        fig_penalty.update_layout(
+            paper_bgcolor="#0f0f1a",
+            plot_bgcolor="#0f0f1a",
+            font=dict(color="#e0e0f0"),
+            xaxis=dict(gridcolor="#1a1a2e", color="#888"),
+            yaxis=dict(gridcolor="#1e1e35", color="#888", title="HP+EXP hilang"),
+            margin=dict(t=20, b=20, l=20, r=20),
+            height=260,
+            showlegend=False,
+        )
+        st.plotly_chart(fig_penalty, width='stretch')
     else:
         st.caption("Belum ada data harian untuk ditampilkan.")
 
