@@ -63,35 +63,33 @@ def get_week_key(d: date | None = None) -> str:
 
 DEFAULT_HABITS: list[dict[str, Any]] = [
     {"id": "subuh", "name": "Subuh", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 1},
-    {"id": "dzuhur", "name": "Dzuhur", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 1},
-    {"id": "asyar", "name": "Asyar", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 1},
+    {"id": "dzuhur", "name": "Dzuhur", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 2},
+    {"id": "asyar", "name": "Asyar", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 2},
     {"id": "magrib", "name": "Magrib", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 1},
     {"id": "isya", "name": "Isya", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 1},
-    {"id": "dzikir", "name": "Dzikir", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 2},
-    {"id": "ngaji", "name": "Ngaji", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 3},
-    {"id": "duha", "name": "Duha", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 4},
+    {"id": "dzikir", "name": "Dzikir", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 3},
+    {"id": "ngaji", "name": "Ngaji", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 4},
+    {"id": "duha", "name": "Duha", "cat": "Faith", "hp": 3, "exp": 5, "hp_pen": 3, "exp_pen": 5, "unlock_level": 5},
     {"id": "jaga_sikap", "name": "Jaga Sikap", "cat": "Faith", "hp": 3, "exp": 3, "hp_pen": 2, "exp_pen": 2, "unlock_level": 5},
 
     {"id": "tidur", "name": "Tidur 7 Jam", "cat": "Fisik Harian", "hp": 5, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 1},
     {"id": "stretching", "name": "Stretching", "cat": "Fisik Harian", "hp": 5, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 1},
     {"id": "pushup_akhir", "name": "Push Up Akhir", "cat": "Fisik Harian", "hp": 10, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 1},
     {"id": "skincare_akhir", "name": "Skincare Akhir", "cat": "Fisik Harian", "hp": 5, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 1},
-    {"id": "minum", "name": "Minum 2 Liter", "cat": "Fisik Harian", "hp": 5, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 1},
+    {"id": "minum", "name": "Minum 2 Liter", "cat": "Fisik Harian", "hp": 5, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 2},
     {"id": "pullup_akhir", "name": "Pull Up Akhir", "cat": "Fisik Harian", "hp": 10, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 2},
     {"id": "rokok", "name": "Merokok 3 Batang", "name_by_level": {4: "Merokok 2 Batang"}, "cat": "Fisik Harian", "hp": 10, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 3},
-    {"id": "plank", "name": "Plank", "cat": "Fisik Harian", "hp": 10, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 3},
+    {"id": "plank", "name": "Plank", "cat": "Fisik Harian", "hp": 10, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 4},
     {"id": "makan", "name": "Makan Bergizi", "cat": "Fisik Harian", "hp": 5, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 3},
-    {"id": "pushup_awal", "name": "Push Up Awal", "cat": "Fisik Harian", "hp": 10, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 4},
+    {"id": "pushup_awal", "name": "Push Up Awal", "cat": "Fisik Harian", "hp": 10, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 5},
     {"id": "pullup_awal", "name": "Pull Up Awal", "cat": "Fisik Harian", "hp": 10, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 4},
-    {"id": "skincare_awal", "name": "Skincare Awal", "cat": "Fisik Harian", "hp": 5, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 4},
+    {"id": "skincare_awal", "name": "Skincare Awal", "cat": "Fisik Harian", "hp": 5, "exp": 0, "hp_pen": 3, "exp_pen": 0, "unlock_level": 2},
 
     {"id": "kuliah", "name": "Kuliah 1 Jam", "cat": "Skill & Knowledge", "hp": 0, "exp": 10, "hp_pen": 0, "exp_pen": 3, "unlock_level": 1},
-    {"id": "video", "name": "1 Video Ilmu", "cat": "Skill & Knowledge", "hp": 0, "exp": 10, "hp_pen": 0, "exp_pen": 3, "unlock_level": 1},
+    {"id": "video", "name": "1 Video Ilmu", "cat": "Skill & Knowledge", "hp": 0, "exp": 10, "hp_pen": 0, "exp_pen": 3, "unlock_level": 2},
     {"id": "projek", "name": "Projek 1 Jam", "cat": "Skill & Knowledge", "hp": 0, "exp": 10, "hp_pen": 0, "exp_pen": 3, "unlock_level": 3},
 
-    {"id": "input_data", "name": "Input Data", "cat": "Evaluasi", "hp": 0, "exp": 5, "hp_pen": 0, "exp_pen": 1, "unlock_level": 1},
     {"id": "evaluasi", "name": "Evaluasi", "cat": "Evaluasi", "hp": 0, "exp": 5, "hp_pen": 0, "exp_pen": 1, "unlock_level": 1},
-    {"id": "metime", "name": "Me Time", "cat": "Evaluasi", "hp": 0, "exp": 5, "hp_pen": 0, "exp_pen": 1, "unlock_level": 2},
 ]
 
 HABIT_CATEGORY_ORDER = ["Faith", "Fisik Harian", "Skill & Knowledge", "Evaluasi", "Custom"]
@@ -126,22 +124,21 @@ COUPONS: list[dict[str, Any]] = [
 
 LEVELS: list[dict[str, Any]] = [
     {"level": 1, "name": "PECUNDANG", "threshold": 0, "avatar": "Lv1"},
-    {"level": 2, "name": "POLOS", "threshold": 500, "avatar": "Lv2"},
-    {"level": 3, "name": "PEJUANG", "threshold": 1200, "avatar": "Lv3"},
-    {"level": 4, "name": "PENDEKAR", "threshold": 2500, "avatar": "Lv4"},
-    {"level": 5, "name": "JAMAL", "threshold": 5000, "avatar": "Lv5"},
+    {"level": 2, "name": "POLOS", "threshold": 2000, "avatar": "Lv2"},
+    {"level": 3, "name": "PEJUANG", "threshold": 5000, "avatar": "Lv3"},
+    {"level": 4, "name": "PENDEKAR", "threshold": 12000, "avatar": "Lv4"},
+    {"level": 5, "name": "JAMAL", "threshold": 25000, "avatar": "Lv5"},
 ]
 
-ACHIEVEMENTS: list[dict[str, str]] = [
-    {"id": "streak3", "name": "On Fire", "desc": "Streak 3 hari", "icon": "*"},
-    {"id": "streak7", "name": "Week Warrior", "desc": "Streak 7 hari", "icon": "*"},
-    {"id": "streak30", "name": "Iron Will", "desc": "Streak 30 hari", "icon": "*"},
-    {"id": "faith7", "name": "Istiqomah", "desc": "Sholat 5 waktu 7 hari", "icon": "*"},
-    {"id": "level2", "name": "Pejuang Sejati", "desc": "Mencapai Level 2", "icon": "*"},
-    {"id": "level3", "name": "Ksatria Muda", "desc": "Mencapai Level 3", "icon": "*"},
-    {"id": "level4", "name": "Sang Pahlawan", "desc": "Mencapai Level 4", "icon": "*"},
-    {"id": "level5", "name": "Sang Legenda", "desc": "Mencapai Level 5", "icon": "*"},
-    {"id": "kupon5", "name": "Reward Hunter", "desc": "Tukar reward 5 kali", "icon": "*"},
+ACHIEVEMENTS: list[dict[str, Any]] = [
+    {"id": "streak3", "name": "On Fire", "desc": "Streak 3 hari", "icon": "*", "reward_hp": 10, "reward_exp": 10},
+    {"id": "streak7", "name": "Week Warrior", "desc": "Streak 7 hari", "icon": "*", "reward_hp": 15, "reward_exp": 15},
+    {"id": "streak14", "name": "Iron Will", "desc": "Streak 14 hari", "icon": "*", "reward_hp": 20, "reward_exp": 20},
+    {"id": "streak30", "name": "Unbreakable", "desc": "Streak 30 hari", "icon": "*", "reward_hp": 25, "reward_exp": 25},
+    {"id": "level2", "name": LEVELS[1]["name"], "desc": "Mencapai Level 2", "icon": "*", "reward_kupon": 200},
+    {"id": "level3", "name": LEVELS[2]["name"], "desc": "Mencapai Level 3", "icon": "*", "reward_kupon": 200},
+    {"id": "level4", "name": LEVELS[3]["name"], "desc": "Mencapai Level 4", "icon": "*", "reward_kupon": 200},
+    {"id": "level5", "name": LEVELS[4]["name"], "desc": "Mencapai Level 5", "icon": "*", "reward_kupon": 200},
     {"id": "habit100", "name": "Konsisten", "desc": "Total 100 habit selesai", "icon": "*"},
 ]
 
@@ -316,7 +313,7 @@ def process_daily_reset(data: dict[str, Any], day: date | None = None) -> dict[s
         data["streak"] = data.get("streak", 0) + 1
         data["best_streak"] = max(data.get("best_streak", 0), data["streak"])
         data["week_days"][day_key] = "full"
-        streak_rewards = {3: 30, 7: 75, 30: 300}
+        streak_rewards = {3: 20, 7: 50, 30: 100}
         if data["streak"] in streak_rewards:
             bonus = streak_rewards[data["streak"]]
             data["kupon"] += bonus
@@ -392,19 +389,23 @@ def check_achievements(data: dict[str, Any]) -> list[str]:
     checks = {
         "streak3": data.get("streak", 0) >= 3,
         "streak7": data.get("streak", 0) >= 7,
+        "streak14": data.get("streak", 0) >= 14,
         "streak30": data.get("streak", 0) >= 30,
-        "faith7": data.get("faith_streak", 0) >= 7,
         "level2": lv_now >= 2,
         "level3": lv_now >= 3,
         "level4": lv_now >= 4,
         "level5": lv_now >= 5,
-        "kupon5": data.get("total_redeems", 0) >= 5,
         "habit100": data.get("total_habits_done", 0) >= 100,
     }
     for ach_id, condition in checks.items():
         if condition and ach_id not in unlocked:
             data["achievements"].append(ach_id)
             newly.append(ach_id)
+            ach_def = next((a for a in ACHIEVEMENTS if a["id"] == ach_id), None)
+            if ach_def:
+                data["hp"] = data.get("hp", 0) + int(ach_def.get("reward_hp", 0))
+                data["exp"] = data.get("exp", 0) + int(ach_def.get("reward_exp", 0))
+                data["kupon"] = data.get("kupon", 0) + int(ach_def.get("reward_kupon", 0))
     return newly
 
 
