@@ -18,7 +18,6 @@ from core import (
     ACHIEVEMENTS,
     COUPONS,
     DEFAULT_OBLIGATIONS,
-    HABIT_CATEGORY_ORDER,
     LEVELS,
     check_achievements,
     date_key,
@@ -26,6 +25,7 @@ from core import (
     get_all_habits,
     get_all_missions,
     get_level,
+    get_ordered_daily_habits,
     get_today_habits,
     get_unlocked_habits,
     get_week_key,
@@ -345,27 +345,22 @@ with tab_harian:
     st.divider()
 
     today_habits = get_today_habits(D)
-    active_habits = get_unlocked_habits(D)
+    ordered_habits = get_ordered_daily_habits(D)
 
-    for category in HABIT_CATEGORY_ORDER:
-        items = [habit for habit in active_habits if habit["cat"] == category]
-        if not items:
-            continue
-        st.markdown(f'<div class="cat-title">{category}</div>', unsafe_allow_html=True)
-        for habit in items:
-            current_value = bool(today_habits.get(habit["id"], False))
-            
-            lvl_info = ""
-            if "unlock_level" in habit and habit["unlock_level"] > 1:
-                lvl_info = f" *(Lv. {habit['unlock_level']})*"
-                
-            label_text = f"{habit['name']}{lvl_info}"
-            
-            new_value = st.checkbox(label_text, value=current_value, key=f"cb_{date_key()}_{habit['id']}")
-            if new_value != current_value:
-                set_today_habit(D, habit["id"], new_value)
-                persist()
-                st.rerun()
+    for habit in ordered_habits:
+        current_value = bool(today_habits.get(habit["id"], False))
+
+        lvl_info = ""
+        if "unlock_level" in habit and habit["unlock_level"] > 1:
+            lvl_info = f" *(Lv. {habit['unlock_level']})*"
+
+        label_text = f"{habit['name']}{lvl_info}"
+
+        new_value = st.checkbox(label_text, value=current_value, key=f"cb_{date_key()}_{habit['id']}")
+        if new_value != current_value:
+            set_today_habit(D, habit["id"], new_value)
+            persist()
+            st.rerun()
 
 # ==================== TAB MINGGUAN ====================
 with tab_mingguan:
