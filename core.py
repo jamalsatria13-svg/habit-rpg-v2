@@ -94,6 +94,41 @@ DEFAULT_HABITS: list[dict[str, Any]] = [
 
 HABIT_CATEGORY_ORDER = ["Faith", "Fisik Harian", "Skill & Knowledge", "Evaluasi", "Custom"]
 
+# Urutan tampilan misi harian di tab Harian, khusus per kombinasi shift + level.
+# Habit yang unlock di level tsb tapi TIDAK ada di list ini (misalnya habit
+# custom yang ditambahkan lewat data lama) tetap akan ditampilkan sebagai
+# fallback di app.py, cuma dikelompokkan di bagian akhir, bukan hilang.
+DAILY_MISSION_ORDER: dict[str, dict[int, list[str]]] = {
+    "Pagi": {
+        1: ["tidur", "stretching", "subuh", "magrib", "kuliah", "pushup_akhir", "skincare_akhir", "isya", "evaluasi"],
+        2: ["tidur", "stretching", "subuh", "skincare_awal", "dzuhur", "asyar", "magrib", "video", "kuliah", "pushup_akhir", "pullup_akhir", "skincare_akhir", "isya", "minum", "evaluasi"],
+        3: ["tidur", "stretching", "subuh", "skincare_awal", "dzuhur", "makan", "asyar", "magrib", "video", "kuliah", "projek", "pushup_akhir", "pullup_akhir", "skincare_akhir", "isya", "dzikir", "minum", "rokok", "evaluasi"],
+        4: ["tidur", "stretching", "pullup_awal", "subuh", "ngaji", "skincare_awal", "dzuhur", "makan", "asyar", "magrib", "video", "kuliah", "projek", "pushup_akhir", "pullup_akhir", "plank", "skincare_akhir", "isya", "dzikir", "minum", "rokok", "evaluasi"],
+        5: ["tidur", "stretching", "pullup_awal", "subuh", "pushup_awal", "ngaji", "skincare_awal", "duha", "dzuhur", "makan", "asyar", "magrib", "video", "kuliah", "projek", "pushup_akhir", "pullup_akhir", "plank", "skincare_akhir", "isya", "dzikir", "minum", "rokok", "jaga_sikap", "evaluasi"],
+    },
+    "Malam": {
+        1: ["tidur", "stretching", "magrib", "isya", "subuh", "kuliah", "pushup_akhir", "skincare_akhir", "evaluasi"],
+        2: ["tidur", "stretching", "asyar", "magrib", "skincare_awal", "isya", "subuh", "video", "kuliah", "pushup_akhir", "pullup_akhir", "skincare_akhir", "minum", "evaluasi", "dzuhur"],
+        3: ["tidur", "stretching", "asyar", "magrib", "dzikir", "video", "skincare_awal", "isya", "makan", "subuh", "kuliah", "projek", "pushup_akhir", "pullup_akhir", "skincare_akhir", "rokok", "minum", "evaluasi", "dzuhur"],
+        4: ["tidur", "stretching", "pullup_awal", "asyar", "magrib", "dzikir", "ngaji", "video", "skincare_awal", "isya", "makan", "subuh", "kuliah", "projek", "pushup_akhir", "pullup_akhir", "plank", "skincare_akhir", "rokok", "minum", "evaluasi", "dzuhur"],
+        5: ["tidur", "stretching", "pullup_awal", "asyar", "pushup_awal", "magrib", "dzikir", "ngaji", "video", "skincare_awal", "isya", "makan", "subuh", "kuliah", "projek", "pushup_akhir", "pullup_akhir", "plank", "duha", "skincare_akhir", "rokok", "minum", "jaga_sikap", "evaluasi", "dzuhur"],
+    },
+}
+
+
+def get_ordered_daily_habits(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Habit yang unlock, diurutkan sesuai shift+level dari DAILY_MISSION_ORDER.
+    Habit unlock yang tidak terdaftar di urutan (misal habit custom lama)
+    tetap ikut, ditaruh di akhir supaya tidak ada yang hilang dari checklist."""
+    level = get_level(data["hp"], data["exp"])[0]["level"]
+    active = get_unlocked_habits(data)
+    by_id = {h["id"]: h for h in active}
+    order = DAILY_MISSION_ORDER.get(data.get("shift", "Pagi"), {}).get(level, [])
+    ordered = [by_id[hid] for hid in order if hid in by_id]
+    leftover_ids = set(by_id.keys()) - set(order)
+    leftover = [h for h in active if h["id"] in leftover_ids]
+    return ordered + leftover
+
 DEFAULT_MISSIONS: list[dict[str, Any]] = [
     {"id": "tahlil", "name": "Tahlil", "hp": 50, "exp": 0, "kupon": 20},
     {"id": "puasa", "name": "Puasa Sunah", "hp": 50, "exp": 0, "kupon": 20},
