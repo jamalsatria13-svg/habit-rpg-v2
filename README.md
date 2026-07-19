@@ -1,3 +1,5 @@
+My first project :v
+
 # Habit RPG 
 
 A habit tracker that turns your daily grind into an RPG. Do your habits, earn HP/EXP/Gold/Kupon, level up. Skip them, take the hit. Built with Streamlit on the frontend and Supabase (Postgres + Auth) on the backend, so multiple people can use it and everyone's data stays separate.
