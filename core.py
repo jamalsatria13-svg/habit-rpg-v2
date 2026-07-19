@@ -23,10 +23,11 @@ WIB = ZoneInfo("Asia/Jakarta") if ZoneInfo else timezone(timedelta(hours=7))
 
 # --- Supabase persistence config ---
 SUPABASE_TABLE = "habit_state"
-SUPABASE_ROW_ID = 1  # single-user: always the same fixed row
 
 
 def _get_supabase_client() -> Client:
+    """Client 'polos' (belum ada sesi login). Dipakai untuk sign_up/sign_in,
+    dan sebagai basis client yang nanti sesinya di-attach setelah login."""
     url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
     key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
     if not url or not key:
@@ -35,6 +36,41 @@ def _get_supabase_client() -> Client:
             "Tambahkan di .streamlit/secrets.toml atau environment variable."
         )
     return create_client(url, key)
+
+
+# --- Auth ---
+def sign_up(email: str, password: str) -> Client:
+    """Daftar user baru. Mengembalikan client yang sudah membawa sesi
+    (kalau project mengharuskan konfirmasi email, session bisa None —
+    caller perlu menangani kasus itu di app.py)."""
+    client = _get_supabase_client()
+    client.auth.sign_up({"email": email, "password": password})
+    return client
+
+
+def sign_in(email: str, password: str) -> Client:
+    """Login. Mengembalikan client yang sesi auth-nya sudah aktif, sehingga
+    setiap request .table(...) berikutnya lewat client ini otomatis membawa
+    JWT user tsb dan auth.uid() di RLS akan terisi dengan benar."""
+    client = _get_supabase_client()
+    client.auth.sign_in_with_password({"email": email, "password": password})
+    return client
+
+
+def sign_out(client: Client) -> None:
+    try:
+        client.auth.sign_out()
+    except Exception:
+        pass  # sesi mungkin sudah invalid/expired, aman diabaikan saat logout
+
+
+def get_current_user_id(client: Client) -> str | None:
+    """Ambil user_id (uuid) dari sesi aktif client, atau None kalau belum login."""
+    try:
+        user = client.auth.get_user()
+        return user.user.id if user and user.user else None
+    except Exception:
+        return None
 
 
 def now_wib() -> datetime:
@@ -224,25 +260,24 @@ def migrate_state(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def load() -> dict[str, Any]:
-    """Load state from Supabase. Falls back to a fresh default_state()
-    in-memory if Supabase is unreachable, so the app doesn't hard-crash —
-    but note that in that fallback case nothing will persist until
-    connectivity is restored."""
+def load(client: Client, user_id: str) -> dict[str, Any]:
+    """Load state milik user_id dari Supabase, lewat client yang sudah login
+    (supaya RLS auth.uid() = user_id terpenuhi). Falls back ke default_state()
+    in-memory kalau Supabase unreachable — dalam kasus itu tidak akan
+    tersimpan sampai koneksi pulih."""
     try:
-        client = _get_supabase_client()
         resp = (
             client.table(SUPABASE_TABLE)
             .select("data")
-            .eq("id", SUPABASE_ROW_ID)
+            .eq("user_id", user_id)
             .execute()
         )
         if resp.data:
             return migrate_state(resp.data[0]["data"])
-        # No row yet: seed it.
+        # User baru, belum punya row: seed dengan default_state().
         state = default_state()
         client.table(SUPABASE_TABLE).insert(
-            {"id": SUPABASE_ROW_ID, "data": state}
+            {"user_id": user_id, "data": state}
         ).execute()
         return state
     except Exception as e:
@@ -250,11 +285,11 @@ def load() -> dict[str, Any]:
         return default_state()
 
 
-def save(data: dict[str, Any]) -> None:
+def save(client: Client, data: dict[str, Any], user_id: str) -> None:
     try:
-        client = _get_supabase_client()
         client.table(SUPABASE_TABLE).upsert(
-            {"id": SUPABASE_ROW_ID, "data": data}
+            {"user_id": user_id, "data": data},
+            on_conflict="user_id",
         ).execute()
     except Exception as e:
         raise RuntimeError(f"Gagal menyimpan data ke Supabase: {e}")
