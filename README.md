@@ -1,5 +1,5 @@
 # My first project :v
-(YOU CAN DO IT)
+( YOU CAN DO IT )
 
 # Habit RPG 
 
