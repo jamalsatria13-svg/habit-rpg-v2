@@ -24,6 +24,7 @@ from core import (
     default_state,
     get_all_habits,
     get_all_missions,
+    get_current_user_id,
     get_level,
     get_ordered_daily_habits,
     get_today_habits,
@@ -34,6 +35,9 @@ from core import (
     run_due_resets,
     save,
     set_today_habit,
+    sign_in,
+    sign_out,
+    sign_up,
     today_wib,
     fmt_rp,
 )
@@ -209,15 +213,76 @@ hr { border-color:#2a2a45 !important; }
     unsafe_allow_html=True,
 )
 
+# ==================== AUTH GATE ====================
+# Client yang sudah login disimpan di session_state (bukan dibuat ulang tiap
+# rerun) supaya sesi auth-nya tidak hilang setiap kali Streamlit re-run
+# script ini pada tiap interaksi user.
+if "sb_client" not in st.session_state:
+    st.session_state.sb_client = None
+if "sb_user_id" not in st.session_state:
+    st.session_state.sb_user_id = None
+
+if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
+    st.markdown("## ⚔️ Habit RPG — Masuk")
+    login_tab, register_tab = st.tabs(["Login", "Daftar"])
+
+    with login_tab:
+        with st.form("login_form"):
+            login_email = st.text_input("Email", key="login_email")
+            login_password = st.text_input("Password", type="password", key="login_password")
+            login_submitted = st.form_submit_button("Login", width='stretch')
+        if login_submitted:
+            try:
+                client = sign_in(login_email, login_password)
+                user_id = get_current_user_id(client)
+                if not user_id:
+                    st.error("Login gagal: email atau password salah.")
+                else:
+                    st.session_state.sb_client = client
+                    st.session_state.sb_user_id = user_id
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Login gagal: {e}")
+
+    with register_tab:
+        with st.form("register_form"):
+            reg_email = st.text_input("Email", key="reg_email")
+            reg_password = st.text_input("Password", type="password", key="reg_password")
+            reg_password_confirm = st.text_input("Konfirmasi Password", type="password", key="reg_password_confirm")
+            reg_submitted = st.form_submit_button("Daftar", width='stretch')
+        if reg_submitted:
+            if reg_password != reg_password_confirm:
+                st.error("Konfirmasi password tidak cocok.")
+            elif len(reg_password) < 6:
+                st.error("Password minimal 6 karakter.")
+            else:
+                try:
+                    client = sign_up(reg_email, reg_password)
+                    user_id = get_current_user_id(client)
+                    if user_id:
+                        st.session_state.sb_client = client
+                        st.session_state.sb_user_id = user_id
+                        st.success("Pendaftaran berhasil!")
+                        st.rerun()
+                    else:
+                        st.info("Pendaftaran berhasil. Silakan cek email untuk konfirmasi, lalu login.")
+                except Exception as e:
+                    st.error(f"Pendaftaran gagal: {e}")
+
+    st.stop()
+
+sb_client = st.session_state.sb_client
+sb_user_id = st.session_state.sb_user_id
+
 if "D" not in st.session_state:
-    st.session_state.D = load()
+    st.session_state.D = load(sb_client, sb_user_id)
 if "notifications" not in st.session_state:
     st.session_state.notifications = []
 
 D = st.session_state.D
 
 def persist() -> None:
-    save(st.session_state.D)
+    save(sb_client, st.session_state.D, sb_user_id)
 
 def notify(message: str) -> None:
     st.session_state.notifications.append(message)
@@ -753,5 +818,12 @@ with tab_profil:
         st.warning("Semua data akan dihapus permanen.")
         if st.button("💥 Konfirmasi Reset", width='stretch'):
             st.session_state.D = default_state()
-            save(st.session_state.D)
+            save(sb_client, st.session_state.D, sb_user_id)
             st.rerun()
+
+    st.divider()
+    if st.button("🚪 Logout", width='stretch'):
+        sign_out(sb_client)
+        for key in ("sb_client", "sb_user_id", "D", "notifications"):
+            st.session_state.pop(key, None)
+        st.rerun()
