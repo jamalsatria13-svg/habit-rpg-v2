@@ -13,6 +13,11 @@ from datetime import date, timedelta
 import plotly.graph_objects as go
 import streamlit as st
 
+try:
+    import extra_streamlit_components as stx
+except ImportError:  # pragma: no cover - dependency may be missing locally
+    stx = None
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core import (
     ACHIEVEMENTS,
@@ -27,11 +32,13 @@ from core import (
     get_current_user_id,
     get_level,
     get_ordered_daily_habits,
+    get_session_tokens,
     get_today_habits,
     get_unlocked_habits,
     get_week_key,
     load,
     now_wib,
+    restore_session,
     run_due_resets,
     save,
     set_today_habit,
@@ -41,6 +48,9 @@ from core import (
     today_wib,
     fmt_rp,
 )
+
+AUTH_COOKIE_NAME = "habit_rpg_auth"
+AUTH_COOKIE_DAYS = 30
 
 st.set_page_config(
     page_title="Habit RPG ⚔️",
@@ -217,19 +227,82 @@ hr { border-color:#2a2a45 !important; }
 # Client yang sudah login disimpan di session_state (bukan dibuat ulang tiap
 # rerun) supaya sesi auth-nya tidak hilang setiap kali Streamlit re-run
 # script ini pada tiap interaksi user.
+cookie_manager = stx.CookieManager() if stx else None
+
+
+def read_auth_cookie() -> dict | None:
+    if cookie_manager is None:
+        return None
+    try:
+        raw_cookie = cookie_manager.get(AUTH_COOKIE_NAME)
+        if not raw_cookie:
+            return None
+        value = json.loads(raw_cookie)
+        if value.get("access_token") and value.get("refresh_token"):
+            return value
+    except Exception:
+        return None
+    return None
+
+
+def save_auth_cookie(client) -> None:
+    if cookie_manager is None:
+        return
+    tokens = get_session_tokens(client)
+    if not tokens:
+        return
+    cookie_manager.set(
+        AUTH_COOKIE_NAME,
+        json.dumps(tokens),
+        expires_at=now_wib() + timedelta(days=AUTH_COOKIE_DAYS),
+    )
+
+
+def clear_auth_cookie() -> None:
+    if cookie_manager is None:
+        return
+    try:
+        cookie_manager.delete(AUTH_COOKIE_NAME)
+    except Exception:
+        pass
+
+
 if "sb_client" not in st.session_state:
     st.session_state.sb_client = None
 if "sb_user_id" not in st.session_state:
     st.session_state.sb_user_id = None
 
 if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
+    remembered_session = read_auth_cookie()
+    if remembered_session and remembered_session != st.session_state.get("_last_bad_auth_cookie"):
+        try:
+            client = restore_session(
+                remembered_session["access_token"],
+                remembered_session["refresh_token"],
+            )
+            user_id = get_current_user_id(client)
+            if user_id:
+                st.session_state.sb_client = client
+                st.session_state.sb_user_id = user_id
+                st.rerun()
+            else:
+                st.session_state["_last_bad_auth_cookie"] = remembered_session
+                clear_auth_cookie()
+        except Exception:
+            st.session_state["_last_bad_auth_cookie"] = remembered_session
+            clear_auth_cookie()
+
+if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
     st.markdown("## ⚔️ Habit RPG — Masuk")
+    if cookie_manager is None:
+        st.caption("Tips: install dependency terbaru agar fitur 'Ingat saya' aktif.")
     login_tab, register_tab = st.tabs(["Login", "Daftar"])
 
     with login_tab:
         with st.form("login_form"):
             login_email = st.text_input("Email", key="login_email")
             login_password = st.text_input("Password", type="password", key="login_password")
+            remember_login = st.checkbox("Ingat saya di perangkat ini", value=True)
             login_submitted = st.form_submit_button("Login", width='stretch')
         if login_submitted:
             try:
@@ -240,6 +313,10 @@ if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
                 else:
                     st.session_state.sb_client = client
                     st.session_state.sb_user_id = user_id
+                    if remember_login:
+                        save_auth_cookie(client)
+                    else:
+                        clear_auth_cookie()
                     st.rerun()
             except Exception as e:
                 st.error(f"Login gagal: {e}")
@@ -262,6 +339,7 @@ if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
                     if user_id:
                         st.session_state.sb_client = client
                         st.session_state.sb_user_id = user_id
+                        save_auth_cookie(client)
                         st.success("Pendaftaran berhasil!")
                         st.rerun()
                     else:
@@ -824,6 +902,7 @@ with tab_profil:
     st.divider()
     if st.button("🚪 Logout", width='stretch'):
         sign_out(sb_client)
+        clear_auth_cookie()
         for key in ("sb_client", "sb_user_id", "D", "notifications"):
             st.session_state.pop(key, None)
         st.rerun()
