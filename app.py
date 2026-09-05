@@ -245,7 +245,7 @@ def read_auth_cookie() -> dict | None:
     return None
 
 
-def save_auth_cookie(client) -> None:
+def save_auth_cookie(client, key: str = "set_auth_cookie") -> None:
     if cookie_manager is None:
         return
     tokens = get_session_tokens(client)
@@ -254,7 +254,10 @@ def save_auth_cookie(client) -> None:
     cookie_manager.set(
         AUTH_COOKIE_NAME,
         json.dumps(tokens),
+        key=key,
         expires_at=now_wib() + timedelta(days=AUTH_COOKIE_DAYS),
+        secure=True,
+        same_site="lax",
     )
 
 
@@ -271,6 +274,8 @@ if "sb_client" not in st.session_state:
     st.session_state.sb_client = None
 if "sb_user_id" not in st.session_state:
     st.session_state.sb_user_id = None
+if "remember_login" not in st.session_state:
+    st.session_state.remember_login = True
 
 if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
     remembered_session = read_auth_cookie()
@@ -313,8 +318,9 @@ if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
                 else:
                     st.session_state.sb_client = client
                     st.session_state.sb_user_id = user_id
+                    st.session_state.remember_login = remember_login
                     if remember_login:
-                        save_auth_cookie(client)
+                        save_auth_cookie(client, key="set_auth_cookie_login")
                     else:
                         clear_auth_cookie()
                     st.rerun()
@@ -339,7 +345,8 @@ if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
                     if user_id:
                         st.session_state.sb_client = client
                         st.session_state.sb_user_id = user_id
-                        save_auth_cookie(client)
+                        st.session_state.remember_login = True
+                        save_auth_cookie(client, key="set_auth_cookie_register")
                         st.success("Pendaftaran berhasil!")
                         st.rerun()
                     else:
@@ -351,6 +358,9 @@ if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
 
 sb_client = st.session_state.sb_client
 sb_user_id = st.session_state.sb_user_id
+
+if st.session_state.get("remember_login", True):
+    save_auth_cookie(sb_client, key="sync_auth_cookie")
 
 if "D" not in st.session_state:
     st.session_state.D = load(sb_client, sb_user_id)
