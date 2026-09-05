@@ -6,11 +6,15 @@ from __future__ import annotations
 
 import json
 import os
+import base64
+import hashlib
+import time
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import streamlit as st
+from cryptography.fernet import Fernet, InvalidToken
 from supabase import create_client, Client
 
 try:
@@ -23,6 +27,17 @@ WIB = ZoneInfo("Asia/Jakarta") if ZoneInfo else timezone(timedelta(hours=7))
 
 # --- Supabase persistence config ---
 SUPABASE_TABLE = "habit_state"
+
+
+def _get_remember_me_cipher() -> Fernet:
+    secret = st.secrets.get("REMEMBER_ME_SECRET") or os.environ.get("REMEMBER_ME_SECRET")
+    if not secret:
+        raise RuntimeError(
+            "REMEMBER_ME_SECRET belum diset. "
+            "Tambahkan string rahasia panjang di Streamlit Secrets untuk mengaktifkan login otomatis."
+        )
+    key = base64.urlsafe_b64encode(hashlib.sha256(str(secret).encode("utf-8")).digest())
+    return Fernet(key)
 
 
 def _get_supabase_client() -> Client:
@@ -73,6 +88,30 @@ def get_session_tokens(client: Client) -> dict[str, str] | None:
         if access_token and refresh_token:
             return {"access_token": access_token, "refresh_token": refresh_token}
     except Exception:
+        return None
+    return None
+
+
+def create_remember_token(email: str, password: str) -> str:
+    payload = json.dumps(
+        {"email": email, "password": password, "created_at": int(time.time())},
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return _get_remember_me_cipher().encrypt(payload).decode("utf-8")
+
+
+def read_remember_token(token: str, max_age_days: int = 30) -> tuple[str, str] | None:
+    try:
+        raw = _get_remember_me_cipher().decrypt(
+            token.encode("utf-8"),
+            ttl=max_age_days * 24 * 60 * 60,
+        )
+        payload = json.loads(raw.decode("utf-8"))
+        email = str(payload.get("email", "")).strip()
+        password = str(payload.get("password", ""))
+        if email and password:
+            return email, password
+    except (InvalidToken, Exception):
         return None
     return None
 

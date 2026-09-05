@@ -3,3 +3,4 @@ plotly>=5.18.0
 pandas>=2.0.0
 supabase>=2.0.0
 extra-streamlit-components>=0.1.71
+cryptography>=42.0.0
