@@ -57,26 +57,6 @@ def sign_in(email: str, password: str) -> Client:
     return client
 
 
-def restore_session(access_token: str, refresh_token: str) -> Client:
-    """Pulihkan sesi Supabase dari token yang disimpan di browser."""
-    client = _get_supabase_client()
-    client.auth.set_session(access_token, refresh_token)
-    return client
-
-
-def get_session_tokens(client: Client) -> dict[str, str] | None:
-    """Ambil access/refresh token aktif untuk fitur 'ingat saya'."""
-    try:
-        session = client.auth.get_session()
-        access_token = getattr(session, "access_token", None)
-        refresh_token = getattr(session, "refresh_token", None)
-        if access_token and refresh_token:
-            return {"access_token": access_token, "refresh_token": refresh_token}
-    except Exception:
-        return None
-    return None
-
-
 def sign_out(client: Client) -> None:
     try:
         client.auth.sign_out()
