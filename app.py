@@ -25,7 +25,6 @@ from core import (
     DEFAULT_OBLIGATIONS,
     LEVELS,
     check_achievements,
-    create_remember_token,
     date_key,
     default_state,
     get_all_habits,
@@ -39,7 +38,6 @@ from core import (
     get_week_key,
     load,
     now_wib,
-    read_remember_token,
     restore_session,
     run_due_resets,
     save,
@@ -53,7 +51,6 @@ from core import (
 
 AUTH_COOKIE_NAME = "habit_rpg_auth"
 AUTH_COOKIE_DAYS = 30
-REMEMBER_QUERY_PARAM = "remember_token"
 
 st.set_page_config(
     page_title="Habit RPG ⚔️",
@@ -281,24 +278,6 @@ if "remember_login" not in st.session_state:
     st.session_state.remember_login = True
 
 if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
-    remember_token = st.query_params.get(REMEMBER_QUERY_PARAM)
-    if remember_token and remember_token != st.session_state.get("_last_bad_remember_token"):
-        remembered_credentials = read_remember_token(remember_token, max_age_days=AUTH_COOKIE_DAYS)
-        if remembered_credentials:
-            try:
-                client = sign_in(*remembered_credentials)
-                user_id = get_current_user_id(client)
-                if user_id:
-                    st.session_state.sb_client = client
-                    st.session_state.sb_user_id = user_id
-                    st.session_state.remember_login = True
-                    st.rerun()
-            except Exception:
-                st.session_state["_last_bad_remember_token"] = remember_token
-        else:
-            st.session_state["_last_bad_remember_token"] = remember_token
-
-if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
     remembered_session = read_auth_cookie()
     if remembered_session and remembered_session != st.session_state.get("_last_bad_auth_cookie"):
         try:
@@ -342,16 +321,8 @@ if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
                     st.session_state.remember_login = remember_login
                     if remember_login:
                         save_auth_cookie(client, key="set_auth_cookie_login")
-                        try:
-                            st.query_params[REMEMBER_QUERY_PARAM] = create_remember_token(
-                                login_email.strip(),
-                                login_password,
-                            )
-                        except Exception as remember_error:
-                            st.warning(f"Login tersimpan di sesi ini, tapi link cepat gagal dibuat: {remember_error}")
                     else:
                         clear_auth_cookie()
-                        st.query_params.pop(REMEMBER_QUERY_PARAM, None)
                     st.rerun()
             except Exception as e:
                 st.error(f"Login gagal: {e}")
@@ -376,13 +347,6 @@ if st.session_state.sb_client is None or st.session_state.sb_user_id is None:
                         st.session_state.sb_user_id = user_id
                         st.session_state.remember_login = True
                         save_auth_cookie(client, key="set_auth_cookie_register")
-                        try:
-                            st.query_params[REMEMBER_QUERY_PARAM] = create_remember_token(
-                                reg_email.strip(),
-                                reg_password,
-                            )
-                        except Exception as remember_error:
-                            st.warning(f"Pendaftaran berhasil, tapi link cepat gagal dibuat: {remember_error}")
                         st.success("Pendaftaran berhasil!")
                         st.rerun()
                     else:
@@ -949,7 +913,6 @@ with tab_profil:
     if st.button("🚪 Logout", width='stretch'):
         sign_out(sb_client)
         clear_auth_cookie()
-        st.query_params.pop(REMEMBER_QUERY_PARAM, None)
         for key in ("sb_client", "sb_user_id", "D", "notifications"):
             st.session_state.pop(key, None)
         st.rerun()

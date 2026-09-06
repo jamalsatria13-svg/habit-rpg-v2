@@ -81,12 +81,9 @@ Create `.streamlit/secrets.toml` — and make sure it's in your `.gitignore`, do
 ```toml
 SUPABASE_URL = "https://xxxxxxxxxxxx.supabase.co"
 SUPABASE_KEY = "your-anon-public-key"
-REMEMBER_ME_SECRET = "make-this-a-long-random-secret-string"
 ```
 
 Use the **anon/public key** here, not the `service_role` key. The service_role key skips RLS entirely, so if it ever leaked (say, an old commit in a public repo), anyone could read or wipe everyone's data.
-
-`REMEMBER_ME_SECRET` is used to encrypt the optional "Ingat saya" quick-login link. Use a long random value and keep it only in Streamlit Secrets / local secrets.
 
 ### 4. Run it
 
