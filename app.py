@@ -18,6 +18,7 @@ from core import (
     ACHIEVEMENTS,
     COUPONS,
     DEFAULT_OBLIGATIONS,
+    DEFAULT_HABITS,
     LEVELS,
     check_achievements,
     date_key,
@@ -59,22 +60,29 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main {
 }
 [data-testid="stSidebar"] { background:#13131f !important; }
 .stTabs [data-baseweb="tab-list"] {
-    background:linear-gradient(135deg,#17172a,#22223c);
+    width:100%;
+    background:#17172a;
     border:1px solid #2d2d4d;
-    border-radius:14px;
-    padding:5px;
+    border-radius:8px;
+    padding:4px;
     gap:6px;
     box-shadow:0 10px 28px rgba(0,0,0,.22);
+    overflow-x:auto;
+    scrollbar-width:none;
 }
 .stTabs [data-baseweb="tab"] {
-    min-height:42px;
-    padding:8px 14px;
+    min-height:40px;
+    height:40px;
+    padding:0 14px;
     background:transparent;
     color:#9b9bb8 !important;
-    border-radius:10px;
+    border-radius:6px;
     font-weight:700;
     font-size:13px;
     letter-spacing:0;
+    white-space:nowrap;
+    flex:0 0 auto;
+    border:1px solid transparent;
 }
 .stTabs [data-baseweb="tab"]:hover {
     background:#252540;
@@ -83,7 +91,16 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .main {
 .stTabs [aria-selected="true"] {
     background:linear-gradient(135deg,#7c3aed,#a78bfa) !important;
     color:#fff !important;
+    border-color:#bda7ff;
     box-shadow:0 8px 18px rgba(124,58,237,.28);
+}
+.stTabs [data-baseweb="tab"] p {
+    margin:0 !important;
+    line-height:1 !important;
+}
+.stTabs [data-baseweb="tab-highlight"],
+.stTabs [data-baseweb="tab-border"] {
+    display:none !important;
 }
 [data-testid="stMetric"] {
     background:#1a1a2e;
@@ -162,7 +179,7 @@ hr { border-color:#2a2a45 !important; }
     font-weight:900;
     box-shadow:0 0 20px rgba(167,139,250,.35);
 }
-.level-badge {
+.level-badge, .about-level-badge {
     display:inline-block;
     background:#272747;
     color:#c4b5fd;
@@ -171,6 +188,32 @@ hr { border-color:#2a2a45 !important; }
     font-size:12px;
     font-weight:800;
     margin-bottom:8px;
+}
+.about-level-card {
+    background:#1a1a2e;
+    border:1px solid #2a2a45;
+    border-radius:8px;
+    padding:12px;
+    margin-bottom:10px;
+}
+.about-level-card.current {
+    border-color:#a78bfa;
+    background:#21183a;
+}
+.about-level-items {
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:8px;
+}
+.about-level-item {
+    background:#111827;
+    border:1px solid #2d2d4d;
+    color:#d6d3ea;
+    border-radius:999px;
+    padding:4px 9px;
+    font-size:12px;
+    font-weight:700;
 }
 .cat-title, .sec {
     font-size:11px;
@@ -387,7 +430,13 @@ if reset_summaries:
 
 show_notifications()
 
-tab_harian, tab_mingguan, tab_progres, tab_profil = st.tabs(["📅 Harian", "⚔️ Mingguan", "📊 Progres", "🏆 Profil"])
+tab_harian, tab_mingguan, tab_progres, tab_profil, tab_about = st.tabs([
+    "📅 Harian",
+    "⚔️ Mingguan",
+    "📊 Progres",
+    "🏆 Profil",
+    "ℹ️ About",
+])
 
 # ==================== TAB HARIAN ====================
 with tab_harian:
@@ -827,3 +876,43 @@ with tab_profil:
         for key in ("sb_client", "sb_user_id", "D", "notifications"):
             st.session_state.pop(key, None)
         st.rerun()
+
+# ==================== TAB ABOUT ====================
+with tab_about:
+    current_level = get_level(D["hp"], D["exp"])[0]["level"]
+    total_power = D["hp"] + D["exp"]
+
+    st.markdown('<div class="sec">ℹ️ Tentang Level</div>', unsafe_allow_html=True)
+    st.caption("Level dihitung dari total HP + EXP. Semakin tinggi level, semakin banyak item misi harian yang terbuka.")
+
+    for level in LEVELS:
+        level_number = int(level["level"])
+        unlock_items = [
+            habit["name"]
+            for habit in DEFAULT_HABITS
+            if int(habit.get("unlock_level", 1)) == level_number
+        ]
+        card_class = "about-level-card current" if level_number == current_level else "about-level-card"
+        status_badge = "CURRENT" if level_number == current_level else f"BUTUH {level['threshold']} HP+EXP"
+        items_html = "".join(f'<span class="about-level-item">{item}</span>' for item in unlock_items)
+        if not items_html:
+            items_html = '<span class="about-level-item">Tidak ada item baru</span>'
+
+        st.markdown(
+            f"""
+            <div class="{card_class}">
+                <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap">
+                    <div>
+                        <span class="about-level-badge">Lv {level_number}</span>
+                        <span style="font-weight:900;color:#f4f0ff;margin-left:6px">{level["name"]}</span>
+                    </div>
+                    <div style="font-size:11px;color:#a78bfa;font-weight:900">{status_badge}</div>
+                </div>
+                <div style="font-size:12px;color:#8b8bb2;margin-top:6px">
+                    Threshold: {level["threshold"]} HP+EXP · Total kamu sekarang: {total_power} HP+EXP
+                </div>
+                <div class="about-level-items">{items_html}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
